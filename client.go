@@ -115,6 +115,11 @@ func (c *Client) requestClient() *http.Client {
 	return &http.Client{Timeout: c.timeout}
 }
 
+// doRequest sends one request and copies a 200 response's body into RespBodyWriter. Every other
+// status is returned typed: a 400 or 401 whose body decodes as the API's error is an [*APIError], a
+// 422 whose body decodes as the API's validation error is a [*ValidationError], and every other
+// unsuccessful response is a [*StatusError], whose Err holds the decode failure of a 400, 401 or
+// 422 body that did not decode. Each carries the response's StatusCode.
 func (c *Client) doRequest(ctx context.Context, RespBodyWriter io.Writer, method, url string, bodyBuf io.Reader, contentType string, queries ...QueryFunc) error {
 	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
@@ -150,19 +155,19 @@ func (c *Client) doRequest(ctx context.Context, RespBodyWriter io.Writer, method
 		}
 		switch resp.StatusCode {
 		case http.StatusBadRequest, http.StatusUnauthorized:
-			apiErr := &APIError{}
+			apiErr := &APIError{StatusCode: resp.StatusCode}
 			if err := json.Unmarshal(respBody, apiErr); err != nil {
-				return err
+				return &StatusError{StatusCode: resp.StatusCode, Err: err}
 			}
 			return apiErr
 		case http.StatusUnprocessableEntity:
-			valErr := &ValidationError{}
+			valErr := &ValidationError{StatusCode: resp.StatusCode}
 			if err := json.Unmarshal(respBody, valErr); err != nil {
-				return err
+				return &StatusError{StatusCode: resp.StatusCode, Err: err}
 			}
 			return valErr
-		default:
-			return fmt.Errorf("unexpected HTTP status \"%d %s\" returned from server", resp.StatusCode, http.StatusText(resp.StatusCode))
+		default: // statuses are an open set the server may extend, so each is forwarded verbatim in StatusCode
+			return &StatusError{StatusCode: resp.StatusCode}
 		}
 	}
 

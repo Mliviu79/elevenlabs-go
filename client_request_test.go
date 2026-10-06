@@ -5,6 +5,7 @@ package elevenlabs
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -252,6 +253,122 @@ func TestTextToSpeechStreamCancelWithHTTPClient(t *testing.T) {
 			}
 			if got := w.String(); got != tc.wantBytes {
 				t.Errorf("TextToSpeechStream() wrote %q, want %q", got, tc.wantBytes)
+			}
+		})
+	}
+}
+
+// statusServer starts a server that answers every request with status and body; it is closed
+// when the test ends.
+func statusServer(tb testing.TB, status int, body string) *httptest.Server {
+	tb.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, body) // best-effort: a failed write shows up as the client's wrong error
+	}))
+	tb.Cleanup(srv.Close)
+	return srv
+}
+
+// wantErrorType names the error type an unsuccessful response is returned as.
+type wantErrorType int
+
+const (
+	wantAPIError wantErrorType = iota
+	wantValidationError
+	wantStatusError
+)
+
+// TestUnsuccessfulResponseStatus verifies that every unsuccessful response reaches the caller with
+// its HTTP status as a typed field, and that a body that did not decode stays reachable.
+func TestUnsuccessfulResponseStatus(t *testing.T) {
+	const (
+		apiErrorBody        = `{"detail":{"status":"invalid_api_key","message":"Invalid API key"}}`
+		validationErrorBody = `{"detail":[{"loc":["body","text"],"msg":"field required","type":"value_error.missing"}]}`
+		notJSONBody         = "Unauthorized"
+	)
+	testCases := []struct {
+		name              string
+		status            int
+		body              string
+		want              wantErrorType
+		wantDecodeFailure bool
+	}{
+		{name: "bad request with an API error body", status: http.StatusBadRequest, body: apiErrorBody, want: wantAPIError},
+		{name: "unauthorized with an API error body", status: http.StatusUnauthorized, body: apiErrorBody, want: wantAPIError},
+		{name: "unprocessable entity with a validation body", status: http.StatusUnprocessableEntity, body: validationErrorBody, want: wantValidationError},
+		{name: "forbidden", status: http.StatusForbidden, want: wantStatusError},
+		{name: "too many requests", status: http.StatusTooManyRequests, want: wantStatusError},
+		{name: "internal server error", status: http.StatusInternalServerError, want: wantStatusError},
+		{name: "service unavailable", status: http.StatusServiceUnavailable, want: wantStatusError},
+		{name: "unauthorized with a body that is not JSON", status: http.StatusUnauthorized, body: notJSONBody, want: wantStatusError, wantDecodeFailure: true},
+		{name: "unprocessable entity with a body that is not JSON", status: http.StatusUnprocessableEntity, body: notJSONBody, want: wantStatusError, wantDecodeFailure: true},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := statusServer(t, tc.status, tc.body)
+			client := NewMockClient(t.Context(), srv.URL, testAPIKey, testRequestTimeout)
+
+			_, err := client.GetModels()
+
+			var apiErr *APIError
+			var valErr *ValidationError
+			var statusErr *StatusError
+			switch tc.want {
+			case wantAPIError:
+				if !errors.As(err, &apiErr) || apiErr.StatusCode != tc.status {
+					t.Errorf("GetModels() = %v, want an *APIError with StatusCode %d", err, tc.status)
+				}
+			case wantValidationError:
+				if !errors.As(err, &valErr) || valErr.StatusCode != tc.status {
+					t.Errorf("GetModels() = %v, want a *ValidationError with StatusCode %d", err, tc.status)
+				}
+			case wantStatusError:
+				if !errors.As(err, &statusErr) || statusErr.StatusCode != tc.status {
+					t.Fatalf("GetModels() = %v, want a *StatusError with StatusCode %d", err, tc.status)
+				}
+				var syntaxErr *json.SyntaxError
+				if gotDecodeFailure := errors.As(statusErr.Unwrap(), &syntaxErr); gotDecodeFailure != tc.wantDecodeFailure {
+					t.Errorf("StatusError.Unwrap() = %v, want a *json.SyntaxError: %t", statusErr.Unwrap(), tc.wantDecodeFailure)
+				}
+				if !tc.wantDecodeFailure && statusErr.Unwrap() != nil {
+					t.Errorf("StatusError.Unwrap() = %v, want nil", statusErr.Unwrap())
+				}
+				if errors.As(err, &apiErr) || errors.As(err, &valErr) {
+					t.Errorf("GetModels() = %v, want neither an *APIError nor a *ValidationError", err)
+				}
+			}
+		})
+	}
+}
+
+// TestStatusErrorError verifies StatusError's text: the response's status, then the body's decode
+// failure when there was one.
+func TestStatusErrorError(t *testing.T) {
+	decodeFailure := json.Unmarshal([]byte("Unauthorized"), &APIError{})
+	if decodeFailure == nil {
+		t.Fatal("json.Unmarshal of a body that is not JSON returned nil")
+	}
+	testCases := []struct {
+		name string
+		err  *StatusError
+		want string
+	}{
+		{
+			name: "status without a decode failure",
+			err:  &StatusError{StatusCode: http.StatusServiceUnavailable},
+			want: `unexpected HTTP status "503 Service Unavailable" returned from server`,
+		},
+		{
+			name: "status with a decode failure",
+			err:  &StatusError{StatusCode: http.StatusUnauthorized, Err: decodeFailure},
+			want: `unexpected HTTP status "401 Unauthorized" returned from server: ` + decodeFailure.Error(),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.err.Error(); got != tc.want {
+				t.Errorf("StatusError.Error() = %q, want %q", got, tc.want)
 			}
 		})
 	}
