@@ -119,7 +119,7 @@ func ExampleClient_GetHistory() {
 	}
 }
 
-func ExampleClient_TextToSpeechWithTimestamps() {
+func ExampleClient_TextToSpeechStreamWithTimestamps() {
 	// Create a new client
 	client := elevenlabs.NewClient(context.Background(), "your-api-key", 30*time.Second)
 

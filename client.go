@@ -81,6 +81,14 @@ func NewClient(ctx context.Context, apiKey string, reqTimeout time.Duration) *Cl
 	return &Client{baseURL: elevenlabsBaseURL, apiKey: apiKey, timeout: reqTimeout, ctx: ctx}
 }
 
+// requestClient returns the http.Client a request is sent through: one bounded by the request
+// timeout the caller gave NewClient or SetTimeout, over http.DefaultTransport, whose connection
+// pool every request shares. It is built per request so that a later SetTimeout takes effect.
+// It never returns the zero http.Client, which bounds nothing.
+func (c *Client) requestClient() *http.Client {
+	return &http.Client{Timeout: c.timeout}
+}
+
 func (c *Client) doRequest(ctx context.Context, RespBodyWriter io.Writer, method, url string, bodyBuf io.Reader, contentType string, queries ...QueryFunc) error {
 	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
@@ -103,8 +111,7 @@ func (c *Client) doRequest(ctx context.Context, RespBodyWriter io.Writer, method
 	}
 	req.URL.RawQuery = q.Encode()
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := c.requestClient().Do(req)
 	if err != nil {
 		return err
 	}
