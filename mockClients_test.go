@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-func NewMockClient(ctx context.Context, baseURL, apiKey string, reqTimeout time.Duration) *Client {
-	c := NewClient(ctx, apiKey, reqTimeout)
+func NewMockClient(ctx context.Context, baseURL, apiKey string, reqTimeout time.Duration, opts ...ClientOption) *Client {
+	c := NewClient(ctx, apiKey, reqTimeout, opts...)
 	c.baseURL = baseURL
 	return c
 }

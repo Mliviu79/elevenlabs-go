@@ -38,10 +38,25 @@ type QueryFunc func(*url.Values)
 // (which defaults to 30 seconds) can be modified with SetAPIKey and SetTimeout respectively, but the parent
 // context is fixed and is set to context.Background().
 type Client struct {
-	baseURL string
-	apiKey  string
-	timeout time.Duration
-	ctx     context.Context
+	baseURL    string
+	apiKey     string
+	timeout    time.Duration
+	ctx        context.Context
+	httpClient *http.Client
+}
+
+// ClientOption configures a Client built by NewClient.
+type ClientOption func(*Client)
+
+// WithHTTPClient returns a ClientOption that sends every request of the Client through hc, which
+// the Client never modifies: hc's Transport and Timeout apply beside the request timeout, which
+// still bounds each request through its context, and cancelling the context the Client was built
+// with cancels a request sent through hc. A nil hc keeps the default, a client bounded by the
+// request timeout over http.DefaultTransport.
+func WithHTTPClient(hc *http.Client) ClientOption {
+	return func(c *Client) {
+		c.httpClient = hc
+	}
 }
 
 func getDefaultClient() *Client {
@@ -73,19 +88,30 @@ func SetTimeout(timeout time.Duration) {
 // It should be used to instantiate a new client with a specific API key, request timeout, and context.
 //
 // It takes a context.Context argument which act as the parent context to be used for requests made by this
-// client, a string argument that represents the API key to be used for authenticated requests and
-// a time.Duration argument that represents the timeout duration for the client's requests.
+// client, a string argument that represents the API key to be used for authenticated requests,
+// a time.Duration argument that represents the timeout duration for the client's requests, and
+// options applied in order. The one option is [WithHTTPClient], which sends every request through a
+// caller-supplied *http.Client; without it each request goes through a client bounded by the
+// request timeout over http.DefaultTransport.
 //
 // It returns a pointer to a newly created Client.
-func NewClient(ctx context.Context, apiKey string, reqTimeout time.Duration) *Client {
-	return &Client{baseURL: elevenlabsBaseURL, apiKey: apiKey, timeout: reqTimeout, ctx: ctx}
+func NewClient(ctx context.Context, apiKey string, reqTimeout time.Duration, opts ...ClientOption) *Client {
+	c := &Client{baseURL: elevenlabsBaseURL, apiKey: apiKey, timeout: reqTimeout, ctx: ctx}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
-// requestClient returns the http.Client a request is sent through: one bounded by the request
-// timeout the caller gave NewClient or SetTimeout, over http.DefaultTransport, whose connection
-// pool every request shares. It is built per request so that a later SetTimeout takes effect.
-// It never returns the zero http.Client, which bounds nothing.
+// requestClient returns the http.Client a request is sent through: the one supplied with
+// WithHTTPClient, unmodified, when there is one; otherwise one bounded by the request timeout the
+// caller gave NewClient or SetTimeout, over http.DefaultTransport, whose connection pool every
+// request shares, built per request so that a later SetTimeout takes effect. Without a supplied
+// client it never returns the zero http.Client, which bounds nothing.
 func (c *Client) requestClient() *http.Client {
+	if c.httpClient != nil {
+		return c.httpClient
+	}
 	return &http.Client{Timeout: c.timeout}
 }
 
