@@ -85,3 +85,25 @@ func TestTextToSpeechRequestOmitsUnsetFields(t *testing.T) {
 		t.Errorf("unset optional fields reached the body: %s", got)
 	}
 }
+
+func TestTextNormalizationMarshalsAsTheAPIString(t *testing.T) {
+	testCases := map[elevenlabs.TextNormalization]string{
+		elevenlabs.TextNormalizationAuto: `"auto"`,
+		elevenlabs.TextNormalizationOn:   `"on"`,
+		elevenlabs.TextNormalizationOff:  `"off"`,
+	}
+	for mode, want := range testCases {
+		got, err := json.Marshal(mode)
+		if err != nil {
+			t.Fatalf("marshalling %q: %v", mode, err)
+		}
+		if string(got) != want {
+			t.Errorf("TextNormalization %q marshalled to %s, want %s", mode, got, want)
+		}
+	}
+}
+
+// ptr returns a pointer to v, for building optional request fields in tests.
+func ptr[T any](v T) *T {
+	return &v
+}

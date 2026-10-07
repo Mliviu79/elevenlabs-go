@@ -190,14 +190,21 @@ type TextToSpeechRequest struct {
 	ModelID                         string                           `json:"model_id,omitempty"`
 	LanguageCode                    string                           `json:"language_code,omitempty"`
 	PronunciationDictionaryLocators []PronunciationDictionaryLocator `json:"pronunciation_dictionary_locators,omitempty"`
-	Seed                            int                              `json:"seed,omitempty"`
-	PreviousText                    string                           `json:"previous_text,omitempty"`
-	NextText                        string                           `json:"next_text,omitempty"`
-	PreviousRequestIds              []string                         `json:"previous_request_ids,omitempty"`
-	NextRequestIds                  []string                         `json:"next_request_ids,omitempty"`
-	ApplyTextNormalization          bool                             `json:"apply_text_normalization,omitempty"`
-	ApplyLanguageTextNormalization  bool                             `json:"apply_language_text_normalization,omitempty"`
-	VoiceSettings                   *VoiceSettings                   `json:"voice_settings,omitempty"`
+	// Seed requests deterministic sampling. Nil omits it and the API applies
+	// its default; non-nil sends the value, zero included.
+	Seed               *uint32  `json:"seed,omitempty"`
+	PreviousText       string   `json:"previous_text,omitempty"`
+	NextText           string   `json:"next_text,omitempty"`
+	PreviousRequestIds []string `json:"previous_request_ids,omitempty"`
+	NextRequestIds     []string `json:"next_request_ids,omitempty"`
+	// ApplyTextNormalization selects the text normalization mode. Empty omits
+	// it and the API applies its default.
+	ApplyTextNormalization TextNormalization `json:"apply_text_normalization,omitempty"`
+	// ApplyLanguageTextNormalization enables language-specific text
+	// normalization. Nil omits it and the API applies its default; non-nil
+	// sends the value, false included.
+	ApplyLanguageTextNormalization *bool          `json:"apply_language_text_normalization,omitempty"`
+	VoiceSettings                  *VoiceSettings `json:"voice_settings,omitempty"`
 }
 ```
 
