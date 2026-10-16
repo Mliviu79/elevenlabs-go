@@ -47,9 +47,9 @@ func TestTextToSpeechStreamSuppliedClientTimeout(t *testing.T) {
 		const suppliedTimeout, requestTimeout = 2 * time.Second, 30 * time.Second
 		tr := &deadlineTransport{ended: make(chan struct{})}
 		hc := &http.Client{Transport: tr, Timeout: suppliedTimeout}
-		client := NewMockClient(t.Context(), unservedBaseURL, testAPIKey, requestTimeout, WithHTTPClient(hc))
+		client := NewMockClient(unservedBaseURL, testAPIKey, requestTimeout, WithHTTPClient(hc))
 
-		err := client.TextToSpeechStream(&signalWriter{firstWrite: make(chan struct{})}, testVoiceID, TextToSpeechRequest{Text: "hello"})
+		err := client.TextToSpeechStream(t.Context(), &signalWriter{firstWrite: make(chan struct{})}, testVoiceID, TextToSpeechRequest{Text: "hello"})
 
 		var netErr net.Error
 		if !errors.As(err, &netErr) || !netErr.Timeout() {

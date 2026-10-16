@@ -80,7 +80,7 @@ func TestDefaultClientSetup(t *testing.T) {
 	defaultClient := elevenlabs.MockDefaultClient(baseURL)
 	elevenlabs.SetAPIKey(mockAPIKey)
 	elevenlabs.SetTimeout(mockTimeout)
-	expected := elevenlabs.NewMockClient(context.Background(), baseURL, mockAPIKey, mockTimeout)
+	expected := elevenlabs.NewMockClient(baseURL, mockAPIKey, mockTimeout)
 	if !reflect.DeepEqual(expected, defaultClient) {
 		t.Errorf("Default client set up is incorrect %+v", defaultClient)
 	}
@@ -96,8 +96,8 @@ func TestRequestTimeout(t *testing.T) {
 		responseDelay:       500 * time.Millisecond,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, 100*time.Millisecond)
-	_, err := client.TextToSpeech("TestVoiceID", elevenlabs.TextToSpeechRequest{})
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, 100*time.Millisecond)
+	_, err := client.TextToSpeech(t.Context(), "TestVoiceID", elevenlabs.TextToSpeechRequest{})
 	if err == nil {
 		t.Fatalf("Expected context deadline exceeded error returned, got nil")
 	}
@@ -116,8 +116,8 @@ func TestAPIErrorOnBadRequestAndUnauthorized(t *testing.T) {
 				responseBody:        testRespBodies["TestAPIErrorOnBadRequestAndUnauthorized"],
 			})
 			defer server.Close()
-			client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-			_, err := client.GetModels()
+			client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+			_, err := client.GetModels(t.Context())
 			if err == nil {
 				t.Errorf("Expected error of type %T with status code %d, got nil", &elevenlabs.APIError{}, code)
 				return
@@ -138,8 +138,8 @@ func TestValidationErrorOnUnprocessableEntity(t *testing.T) {
 		responseBody:        testRespBodies["TestValidationErrorOnUnprocessableEntity"],
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	_, err := client.TextToSpeech("TestVoiceID", elevenlabs.TextToSpeechRequest{})
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	_, err := client.TextToSpeech(t.Context(), "TestVoiceID", elevenlabs.TextToSpeechRequest{})
 	if err == nil {
 		t.Errorf("Expected error of type %T, got nil", &elevenlabs.ValidationError{})
 		return
@@ -199,8 +199,8 @@ func TestErrorOnUnexpectedStatusCode(t *testing.T) {
 		statusCode:          http.StatusInternalServerError,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	_, err := client.TextToSpeech("TestVoiceID", elevenlabs.TextToSpeechRequest{})
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	_, err := client.TextToSpeech(t.Context(), "TestVoiceID", elevenlabs.TextToSpeechRequest{})
 	if err == nil {
 		t.Error("Expected error, got nil")
 		return
@@ -284,8 +284,8 @@ func TestTextToSpeech(t *testing.T) {
 			})
 			defer server.Close()
 
-			client := elevenlabs.NewMockClient(context.Background(), server.URL, requestAPIKey, mockTimeout)
-			respBody, err := client.TextToSpeech("voiceID", tc.testRequestBody.(elevenlabs.TextToSpeechRequest), tc.queries...)
+			client := elevenlabs.NewMockClient(server.URL, requestAPIKey, mockTimeout)
+			respBody, err := client.TextToSpeech(t.Context(), "voiceID", tc.testRequestBody.(elevenlabs.TextToSpeechRequest), tc.queries...)
 
 			if err != nil {
 				t.Errorf("Expected no errors, got error: %q", err)
@@ -345,9 +345,9 @@ func TestTextToSpeechStream(t *testing.T) {
 			})
 			defer server.Close()
 
-			client := elevenlabs.NewMockClient(context.Background(), server.URL, requestAPIKey, mockTimeout)
+			client := elevenlabs.NewMockClient(server.URL, requestAPIKey, mockTimeout)
 			w := bytes.Buffer{}
-			err := client.TextToSpeechStream(&w, "voiceID", tc.testRequestBody.(elevenlabs.TextToSpeechRequest), tc.queries...)
+			err := client.TextToSpeechStream(t.Context(), &w, "voiceID", tc.testRequestBody.(elevenlabs.TextToSpeechRequest), tc.queries...)
 			if err != nil {
 				t.Errorf("Expected no errors, got error: %q", err)
 			}
@@ -370,8 +370,8 @@ func TestGetModels(t *testing.T) {
 		responseBody:        respBody,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	models, err := client.GetModels()
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	models, err := client.GetModels(t.Context())
 	if err != nil {
 		t.Errorf("Expected no errors from `GetModels`, got \"%T\" error: %q", err, err)
 	}
@@ -397,8 +397,8 @@ func TestGetVoices(t *testing.T) {
 		responseBody:        respBody,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	voices, err := client.GetVoices()
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	voices, err := client.GetVoices(t.Context())
 	if err != nil {
 		t.Errorf("Expected no errors from `GetVoices`, got \"%T\" error: %q", err, err)
 	}
@@ -424,8 +424,8 @@ func TestGetDefaultVoiceSettings(t *testing.T) {
 		responseBody:        respBody,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	vSettings, err := client.GetDefaultVoiceSettings()
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	vSettings, err := client.GetDefaultVoiceSettings(t.Context())
 	if err != nil {
 		t.Errorf("Expected no errors from `GetDefaultVoiceSettings`, got \"%T\" error: %q", err, err)
 	}
@@ -448,8 +448,8 @@ func TestGetVoiceSettings(t *testing.T) {
 		responseBody:        respBody,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	vSettings, err := client.GetVoiceSettings("TestVoiceID")
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	vSettings, err := client.GetVoiceSettings(t.Context(), "TestVoiceID")
 	if err != nil {
 		t.Errorf("Expected no errors from `GetVoiceSettings`, got \"%T\" error: %q", err, err)
 	}
@@ -488,8 +488,8 @@ func TestGetVoice(t *testing.T) {
 				responseBody:        []byte(respBody),
 			})
 			defer server.Close()
-			client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-			voice, err := client.GetVoice("TestVoiceID", tc.queries...)
+			client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+			voice, err := client.GetVoice(t.Context(), "TestVoiceID", tc.queries...)
 			if err != nil {
 				t.Errorf("Expected no errors from `GetVoice`, got \"%T\" error: %q", err, err)
 			}
@@ -512,8 +512,8 @@ func TestDeleteVoice(t *testing.T) {
 		statusCode:          http.StatusOK,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	err := client.DeleteVoice("TestVoiceID")
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	err := client.DeleteVoice(t.Context(), "TestVoiceID")
 	if err != nil {
 		t.Errorf("Expected no errors from `DeleteVoice`, got \"%T\" error: %q", err, err)
 	}
@@ -527,8 +527,8 @@ func TestEditVoiceSettings(t *testing.T) {
 		statusCode:          http.StatusOK,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	err := client.EditVoiceSettings("TestVoiceID", elevenlabs.VoiceSettings{Stability: ptr[float32](0.2), SimilarityBoost: ptr[float32](0.7), Style: ptr[float32](0.3), SpeakerBoost: ptr(false)})
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	err := client.EditVoiceSettings(t.Context(), "TestVoiceID", elevenlabs.VoiceSettings{Stability: ptr[float32](0.2), SimilarityBoost: ptr[float32](0.7), Style: ptr[float32](0.3), SpeakerBoost: ptr(false)})
 	if err != nil {
 		t.Errorf("Expected no errors, got error: %q", err)
 	}
@@ -570,8 +570,8 @@ func TestAddVoice(t *testing.T) {
 				responseBody:        tc.expRespBody,
 			})
 			defer server.Close()
-			client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-			id, err := client.AddVoice(request)
+			client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+			id, err := client.AddVoice(t.Context(), request)
 			if err != nil {
 				if !tc.expError {
 					t.Errorf("Expected no errors, got error: %q", err)
@@ -599,8 +599,8 @@ func TestEditVoice(t *testing.T) {
 		statusCode:          http.StatusOK,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	err := client.EditVoice("TestVoiceID", elevenlabs.AddEditVoiceRequest{Name: "TestVoice"})
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	err := client.EditVoice(t.Context(), "TestVoiceID", elevenlabs.AddEditVoiceRequest{Name: "TestVoice"})
 	if err != nil {
 		t.Errorf("Expected no errors, got error: %q", err)
 	}
@@ -614,8 +614,8 @@ func TestDeleteSample(t *testing.T) {
 		statusCode:          http.StatusOK,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	err := client.DeleteSample("TestVoiceID", "TestSampleID")
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	err := client.DeleteSample(t.Context(), "TestVoiceID", "TestSampleID")
 	if err != nil {
 		t.Errorf("Expected no errors from `DeleteSample`, got \"%T\" error: %q", err, err)
 	}
@@ -632,8 +632,8 @@ func TestGetSampleAudio(t *testing.T) {
 		responseBody:        []byte(expRespBody),
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	respBody, err := client.GetSampleAudio("TestVoiceID", "TestSampleID")
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	respBody, err := client.GetSampleAudio(t.Context(), "TestVoiceID", "TestSampleID")
 	if err != nil {
 		t.Errorf("Expected no errors from `GetSampleAudio`, got \"%T\" error: %q", err, err)
 	}
@@ -683,9 +683,9 @@ func TestGetHistory(t *testing.T) {
 			}
 			server := testServer(t, config)
 			defer server.Close()
-			client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
+			client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
 
-			resp, nextPageFunc, err := client.GetHistory(tc.queries...)
+			resp, nextPageFunc, err := client.GetHistory(t.Context(), tc.queries...)
 			if err != nil {
 				t.Fatalf("Expected GetHistory to return no error, got %q", err)
 			}
@@ -707,7 +707,7 @@ func TestGetHistory(t *testing.T) {
 				return
 			}
 
-			nextResp, _, err := nextPageFunc(elevenlabs.PageSize(99))
+			nextResp, _, err := nextPageFunc(t.Context(), elevenlabs.PageSize(99))
 			if err != nil {
 				t.Fatalf("Expected GetHistory to return no error, got %q", err)
 			}
@@ -735,8 +735,8 @@ func TestGetHistoryItem(t *testing.T) {
 		responseBody:        respBody,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	historyItem, err := client.GetHistoryItem("TestHistoryItemID")
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	historyItem, err := client.GetHistoryItem(t.Context(), "TestHistoryItemID")
 	if err != nil {
 		t.Errorf("Expected no errors from `GetHistoryItem`, got \"%T\" error: %q", err, err)
 	}
@@ -757,8 +757,8 @@ func TestDeleteHistoryItem(t *testing.T) {
 		statusCode:          http.StatusOK,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	err := client.DeleteHistoryItem("TestHistoryItemID")
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	err := client.DeleteHistoryItem(t.Context(), "TestHistoryItemID")
 	if err != nil {
 		t.Errorf("Expected no errors from `DeleteHistoryItem`, got \"%T\" error: %q", err, err)
 	}
@@ -774,8 +774,8 @@ func TestGetHistoryItemAudio(t *testing.T) {
 		responseBody:        []byte(expRespBody),
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	respBody, err := client.GetHistoryItemAudio("TestHistoryItemID")
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	respBody, err := client.GetHistoryItemAudio(t.Context(), "TestHistoryItemID")
 	if err != nil {
 		t.Errorf("Expected no errors from `GetHistoryItemAudio`, got \"%T\" error: %q", err, err)
 	}
@@ -794,8 +794,8 @@ func TestDownloadHistoryAudio(t *testing.T) {
 	})
 	defer server.Close()
 
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	respBody, err := client.DownloadHistoryAudio(elevenlabs.DownloadHistoryRequest{HistoryItemIds: []string{"TestHistoryItemID"}})
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	respBody, err := client.DownloadHistoryAudio(t.Context(), elevenlabs.DownloadHistoryRequest{HistoryItemIds: []string{"TestHistoryItemID"}})
 
 	if err != nil {
 		t.Errorf("Expected no errors, got error: %q", err)
@@ -816,8 +816,8 @@ func TestGetSubscription(t *testing.T) {
 		responseBody:        respBody,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	subscription, err := client.GetSubscription()
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	subscription, err := client.GetSubscription(t.Context())
 	if err != nil {
 		t.Errorf("Expected no errors from `GetSubscription`, got \"%T\" error: %q", err, err)
 	}
@@ -840,8 +840,8 @@ func TestGetUser(t *testing.T) {
 		responseBody:        respBody,
 	})
 	defer server.Close()
-	client := elevenlabs.NewMockClient(context.Background(), server.URL, mockAPIKey, mockTimeout)
-	user, err := client.GetUser()
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	user, err := client.GetUser(t.Context())
 	if err != nil {
 		t.Errorf("Expected no errors from `GetUser`, got \"%T\" error: %q", err, err)
 	}

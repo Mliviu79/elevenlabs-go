@@ -1,12 +1,9 @@
 package elevenlabs
 
-import (
-	"context"
-	"time"
-)
+import "time"
 
-func NewMockClient(ctx context.Context, baseURL, apiKey string, reqTimeout time.Duration, opts ...ClientOption) *Client {
-	c := NewClient(ctx, apiKey, reqTimeout, opts...)
+func NewMockClient(baseURL, apiKey string, reqTimeout time.Duration, opts ...ClientOption) *Client {
+	c := NewClient(apiKey, reqTimeout, opts...)
 	c.baseURL = baseURL
 	return c
 }

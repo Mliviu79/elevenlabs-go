@@ -32,7 +32,7 @@ Full documentation of this library is available [here](https://pkg.go.dev/github
 
 ### Using a New Client Instance
 
-Using the `NewClient` function returns a new `Client` instance will allow to pass a parent context, your API key and a timeout duration.
+Using the `NewClient` function returns a new `Client` instance configured with your API key and a timeout duration. Every request method takes the `context.Context` the request is bound to as its first argument; cancelling it aborts the request.
 
 ```go
 package main
@@ -48,7 +48,7 @@ import (
 
 func main() {
  // Create a new client
- client := elevenlabs.NewClient(context.Background(), "your-api-key", 30*time.Second)
+ client := elevenlabs.NewClient("your-api-key", 30*time.Second)
 
  // Create a TextToSpeechRequest
  ttsReq := elevenlabs.TextToSpeechRequest{
@@ -57,7 +57,7 @@ func main() {
  }
 
  // Call the TextToSpeech method on the client, using the "Adam"'s voice ID.
- audio, err := client.TextToSpeech("pNInz6obpgDQGcFmaJgB", ttsReq)
+ audio, err := client.TextToSpeech(context.Background(), "pNInz6obpgDQGcFmaJgB", ttsReq)
  if err != nil {
   log.Fatal(err)
  }
@@ -73,12 +73,13 @@ func main() {
 
 ### Using the Default Client and proxy functions
 
-The library has a default client you can configure and use with proxy functions that wrap method calls to the default client. The default client has a default timeout set to 30 seconds and is configured with `context.Background()` as the the parent context. You will only need to set your API key at minimum when taking advantage of the default client. Here's the a version of the above example above using shorthand functions only.
+The library has a default client you can configure and use with proxy functions that wrap method calls to the default client. The default client has a default timeout set to 30 seconds, and each proxy function takes the request's context as its first argument like the methods it wraps. You will only need to set your API key at minimum when taking advantage of the default client. Here's the a version of the above example above using shorthand functions only.
 
 ```go
 package main
 
 import (
+ "context"
  "log"
  "os"
  "time"
@@ -94,7 +95,7 @@ func main() {
  el.SetTimeout(15 * time.Second)
 
  // Call the TextToSpeech method on the client, using the "Adam"'s voice ID.
- audio, err := el.TextToSpeech("pNInz6obpgDQGcFmaJgB", el.TextToSpeechRequest{
+ audio, err := el.TextToSpeech(context.Background(), "pNInz6obpgDQGcFmaJgB", el.TextToSpeechRequest{
    Text:    "Hello, world! My name is Adam, nice to meet you!",
    ModelID: "eleven_monolingual_v1",
   })
@@ -155,6 +156,7 @@ immediately, even if the buffer isn't full.`
 
  // Stream the audio to the pipe connected to mpv's standard input
  if err := elevenlabs.TextToSpeechStream(
+  context.Background(),
   pipe,
   "pNInz6obpgDQGcFmaJgB",
   elevenlabs.TextToSpeechRequest{
@@ -232,7 +234,7 @@ import (
 
 func main() {
  // Create a new client
- client := elevenlabs.NewClient(context.Background(), "your-api-key", 30*time.Second)
+ client := elevenlabs.NewClient("your-api-key", 30*time.Second)
 
  // Create a TextToSpeechRequest
  ttsReq := elevenlabs.TextToSpeechRequest{
@@ -248,7 +250,7 @@ func main() {
  defer file.Close()
 
  // Call the TextToSpeechWithTimestamps method, streaming the JSON response to the file
- err = client.TextToSpeechWithTimestamps(file, "pNInz6obpgDQGcFmaJgB", ttsReq)
+ err = client.TextToSpeechStreamWithTimestamps(context.Background(), file, "pNInz6obpgDQGcFmaJgB", ttsReq)
  if err != nil {
   log.Fatal(err)
  }

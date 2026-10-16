@@ -26,7 +26,10 @@ const (
 
 package elevenlabs
 
-import "io"
+import (
+	"context"
+	"io"
+)
 {{range .Functions}}
 // {{.FuncIdent}} calls the {{.FuncIdent}} method on the default client.
 func {{.FuncIdent}}{{.FuncParams}}{{.FuncResults}} {

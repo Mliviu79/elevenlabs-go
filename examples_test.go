@@ -13,7 +13,7 @@ import (
 
 func ExampleClient_TextToSpeech() {
 	// Create a new client
-	client := elevenlabs.NewClient(context.Background(), "your-api-key", 30*time.Second)
+	client := elevenlabs.NewClient("your-api-key", 30*time.Second)
 
 	// Create a TextToSpeechRequest
 	ttsReq := elevenlabs.TextToSpeechRequest{
@@ -22,7 +22,7 @@ func ExampleClient_TextToSpeech() {
 	}
 
 	// Call the TextToSpeech method on the client, using the "Adam"'s voice ID.
-	audio, err := client.TextToSpeech("pNInz6obpgDQGcFmaJgB", ttsReq)
+	audio, err := client.TextToSpeech(context.Background(), "pNInz6obpgDQGcFmaJgB", ttsReq)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,7 +61,7 @@ immediately, even if the buffer isn't full.`
 	}
 
 	// Stream the audio to the pipe connected to mpv's standard input
-	if err := elevenlabs.TextToSpeechStream(
+	if err := elevenlabs.TextToSpeechStream(context.Background(),
 		pipe,
 		"pNInz6obpgDQGcFmaJgB",
 		elevenlabs.TextToSpeechRequest{
@@ -96,11 +96,11 @@ func ExampleClient_GetHistory() {
 		}
 	}
 	// Create a new client
-	client := elevenlabs.NewClient(context.Background(), "your-api-key", 30*time.Second)
+	client := elevenlabs.NewClient("your-api-key", 30*time.Second)
 
 	// Get and print the first page (5 items).
 	page := 1
-	historyResp, nextPage, err := client.GetHistory(elevenlabs.PageSize(5))
+	historyResp, nextPage, err := client.GetHistory(context.Background(), elevenlabs.PageSize(5))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func ExampleClient_GetHistory() {
 		page++
 		// Retrieve the next page. The page size from the original call is retained but
 		// can be overwritten by passing a call to PageSize with the new size.
-		historyResp, nextPage, err = nextPage()
+		historyResp, nextPage, err = nextPage(context.Background())
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -121,7 +121,7 @@ func ExampleClient_GetHistory() {
 
 func ExampleClient_TextToSpeechStreamWithTimestamps() {
 	// Create a new client
-	client := elevenlabs.NewClient(context.Background(), "your-api-key", 30*time.Second)
+	client := elevenlabs.NewClient("your-api-key", 30*time.Second)
 
 	// Create a TextToSpeechRequest
 	ttsReq := elevenlabs.TextToSpeechRequest{
@@ -137,7 +137,7 @@ func ExampleClient_TextToSpeechStreamWithTimestamps() {
 	defer file.Close()
 
 	// Call the TextToSpeechWithTimestamps method, streaming the JSON response to the file
-	err = client.TextToSpeechStreamWithTimestamps(file, "pNInz6obpgDQGcFmaJgB", ttsReq)
+	err = client.TextToSpeechStreamWithTimestamps(context.Background(), file, "pNInz6obpgDQGcFmaJgB", ttsReq)
 	if err != nil {
 		log.Fatal(err)
 	}

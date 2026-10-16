@@ -89,10 +89,10 @@ func TestTextToSpeechStreamWithHTTPClient(t *testing.T) {
 			if tc.supply {
 				hc = &http.Client{Transport: rec}
 			}
-			client := NewMockClient(t.Context(), srv.URL, testAPIKey, testRequestTimeout, WithHTTPClient(hc))
+			client := NewMockClient(srv.URL, testAPIKey, testRequestTimeout, WithHTTPClient(hc))
 
 			var w bytes.Buffer
-			if err := client.TextToSpeechStream(&w, testVoiceID, TextToSpeechRequest{Text: "hello"}); err != nil {
+			if err := client.TextToSpeechStream(t.Context(), &w, testVoiceID, TextToSpeechRequest{Text: "hello"}); err != nil {
 				t.Fatalf("TextToSpeechStream() = %v, want nil", err)
 			}
 
@@ -197,8 +197,8 @@ func (w *signalWriter) String() string {
 	return w.buf.String()
 }
 
-// TestTextToSpeechStreamCancelWithHTTPClient verifies that cancelling the context the Client was
-// built with cancels a request sent through a supplied client, before its response and mid-body.
+// TestTextToSpeechStreamCancelWithHTTPClient verifies that cancelling the context a request was
+// made with cancels it when it is sent through a supplied client, before its response and mid-body.
 func TestTextToSpeechStreamCancelWithHTTPClient(t *testing.T) {
 	const chunk = "first chunk"
 	testCases := []struct {
@@ -221,11 +221,11 @@ func TestTextToSpeechStreamCancelWithHTTPClient(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(t.Context())
 			t.Cleanup(cancel)
-			client := NewMockClient(ctx, srv.URL, testAPIKey, testRequestTimeout, WithHTTPClient(&http.Client{Transport: tr}))
+			client := NewMockClient(srv.URL, testAPIKey, testRequestTimeout, WithHTTPClient(&http.Client{Transport: tr}))
 
 			errc := make(chan error, 1)
 			go func() {
-				errc <- client.TextToSpeechStream(w, testVoiceID, TextToSpeechRequest{Text: "hello"})
+				errc <- client.TextToSpeechStream(ctx, w, testVoiceID, TextToSpeechRequest{Text: "hello"})
 			}()
 
 			select {
@@ -307,9 +307,9 @@ func TestUnsuccessfulResponseStatus(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := statusServer(t, tc.status, tc.body)
-			client := NewMockClient(t.Context(), srv.URL, testAPIKey, testRequestTimeout)
+			client := NewMockClient(srv.URL, testAPIKey, testRequestTimeout)
 
-			_, err := client.GetModels()
+			_, err := client.GetModels(t.Context())
 
 			var apiErr *APIError
 			var valErr *ValidationError

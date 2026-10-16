@@ -35,13 +35,12 @@ type QueryFunc func(*url.Values)
 //
 // This library also includes a default client instance that can be used when it's more convenient or when
 // only a single instance of Client will ever be used by the program. The default client's API key and timeout
-// (which defaults to 30 seconds) can be modified with SetAPIKey and SetTimeout respectively, but the parent
-// context is fixed and is set to context.Background().
+// (which defaults to 30 seconds) can be modified with SetAPIKey and SetTimeout respectively. Every request
+// takes the context it is bound to as its first argument, so cancelling that context aborts the request.
 type Client struct {
 	baseURL    string
 	apiKey     string
 	timeout    time.Duration
-	ctx        context.Context
 	httpClient *http.Client
 }
 
@@ -61,7 +60,7 @@ func WithHTTPClient(hc *http.Client) ClientOption {
 
 func getDefaultClient() *Client {
 	once.Do(func() {
-		defaultClient = NewClient(context.Background(), "", defaultTimeout)
+		defaultClient = NewClient("", defaultTimeout)
 	})
 	return defaultClient
 }
@@ -85,18 +84,17 @@ func SetTimeout(timeout time.Duration) {
 
 // NewClient creates and returns a new Client object with provided settings.
 //
-// It should be used to instantiate a new client with a specific API key, request timeout, and context.
+// It should be used to instantiate a new client with a specific API key and request timeout.
 //
-// It takes a context.Context argument which act as the parent context to be used for requests made by this
-// client, a string argument that represents the API key to be used for authenticated requests,
+// It takes a string argument that represents the API key to be used for authenticated requests,
 // a time.Duration argument that represents the timeout duration for the client's requests, and
 // options applied in order. The one option is [WithHTTPClient], which sends every request through a
 // caller-supplied *http.Client; without it each request goes through a client bounded by the
 // request timeout over http.DefaultTransport.
 //
 // It returns a pointer to a newly created Client.
-func NewClient(ctx context.Context, apiKey string, reqTimeout time.Duration, opts ...ClientOption) *Client {
-	c := &Client{baseURL: elevenlabsBaseURL, apiKey: apiKey, timeout: reqTimeout, ctx: ctx}
+func NewClient(apiKey string, reqTimeout time.Duration, opts ...ClientOption) *Client {
+	c := &Client{baseURL: elevenlabsBaseURL, apiKey: apiKey, timeout: reqTimeout}
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -253,13 +251,13 @@ func StartAfter(id string) QueryFunc {
 // are LatencyOptimizations and OutputFormat
 //
 // It returns a byte slice that contains mpeg encoded audio data in case of success, or an error.
-func (c *Client) TextToSpeech(voiceID string, ttsReq TextToSpeechRequest, queries ...QueryFunc) ([]byte, error) {
+func (c *Client) TextToSpeech(ctx context.Context, voiceID string, ttsReq TextToSpeechRequest, queries ...QueryFunc) ([]byte, error) {
 	reqBody, err := json.Marshal(ttsReq)
 	if err != nil {
 		return nil, err
 	}
 	b := bytes.Buffer{}
-	err = c.doRequest(c.ctx, &b, http.MethodPost, fmt.Sprintf("%s/text-to-speech/%s", c.baseURL, voiceID), bytes.NewBuffer(reqBody), contentTypeJSON, queries...)
+	err = c.doRequest(ctx, &b, http.MethodPost, fmt.Sprintf("%s/text-to-speech/%s", c.baseURL, voiceID), bytes.NewBuffer(reqBody), contentTypeJSON, queries...)
 	if err != nil {
 		return nil, err
 	}
@@ -276,13 +274,13 @@ func (c *Client) TextToSpeech(voiceID string, ttsReq TextToSpeechRequest, querie
 // It is important to set the timeout of the client to a duration large enough to maintain the desired streaming period.
 //
 // It returns nil if successful or an error otherwise.
-func (c *Client) TextToSpeechStream(streamWriter io.Writer, voiceID string, ttsReq TextToSpeechRequest, queries ...QueryFunc) error {
+func (c *Client) TextToSpeechStream(ctx context.Context, streamWriter io.Writer, voiceID string, ttsReq TextToSpeechRequest, queries ...QueryFunc) error {
 	reqBody, err := json.Marshal(ttsReq)
 	if err != nil {
 		return err
 	}
 
-	return c.doRequest(c.ctx, streamWriter, http.MethodPost, fmt.Sprintf("%s/text-to-speech/%s/stream", c.baseURL, voiceID), bytes.NewBuffer(reqBody), contentTypeJSON, queries...)
+	return c.doRequest(ctx, streamWriter, http.MethodPost, fmt.Sprintf("%s/text-to-speech/%s/stream", c.baseURL, voiceID), bytes.NewBuffer(reqBody), contentTypeJSON, queries...)
 }
 
 // TextToSpeechStreamWithTimestamps converts a given text to speech audio with character-level timestamps.
@@ -298,21 +296,21 @@ func (c *Client) TextToSpeechStream(streamWriter io.Writer, voiceID string, ttsR
 // It is important to set the timeout of the client to a duration large enough to maintain the desired streaming period.
 //
 // It returns nil if successful or an error otherwise.
-func (c *Client) TextToSpeechStreamWithTimestamps(streamWriter io.Writer, voiceID string, ttsReq TextToSpeechRequest, queries ...QueryFunc) error {
+func (c *Client) TextToSpeechStreamWithTimestamps(ctx context.Context, streamWriter io.Writer, voiceID string, ttsReq TextToSpeechRequest, queries ...QueryFunc) error {
 	reqBody, err := json.Marshal(ttsReq)
 	if err != nil {
 		return err
 	}
 
-	return c.doRequest(c.ctx, streamWriter, http.MethodPost, fmt.Sprintf("%s/text-to-speech/%s/stream/with-timestamps", c.baseURL, voiceID), bytes.NewBuffer(reqBody), contentTypeJSON, queries...)
+	return c.doRequest(ctx, streamWriter, http.MethodPost, fmt.Sprintf("%s/text-to-speech/%s/stream/with-timestamps", c.baseURL, voiceID), bytes.NewBuffer(reqBody), contentTypeJSON, queries...)
 }
 
 // GetModels retrieves the list of all available models.
 //
 // It returns a slice of Model objects or an error.
-func (c *Client) GetModels() ([]Model, error) {
+func (c *Client) GetModels(ctx context.Context) ([]Model, error) {
 	b := bytes.Buffer{}
-	err := c.doRequest(c.ctx, &b, http.MethodGet, fmt.Sprintf("%s/models", c.baseURL), &bytes.Buffer{}, contentTypeJSON)
+	err := c.doRequest(ctx, &b, http.MethodGet, fmt.Sprintf("%s/models", c.baseURL), &bytes.Buffer{}, contentTypeJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -328,9 +326,9 @@ func (c *Client) GetModels() ([]Model, error) {
 // GetVoices retrieves the list of all voices available for use.
 //
 // It returns a slice of Voice objects or an error.
-func (c *Client) GetVoices() ([]Voice, error) {
+func (c *Client) GetVoices(ctx context.Context) ([]Voice, error) {
 	b := bytes.Buffer{}
-	err := c.doRequest(c.ctx, &b, http.MethodGet, fmt.Sprintf("%s/voices", c.baseURL), &bytes.Buffer{}, contentTypeJSON)
+	err := c.doRequest(ctx, &b, http.MethodGet, fmt.Sprintf("%s/voices", c.baseURL), &bytes.Buffer{}, contentTypeJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -346,10 +344,10 @@ func (c *Client) GetVoices() ([]Voice, error) {
 // GetDefaultVoiceSettings retrieves the default settings for voices
 //
 // It returns a VoiceSettings object or an error.
-func (c *Client) GetDefaultVoiceSettings() (VoiceSettings, error) {
+func (c *Client) GetDefaultVoiceSettings(ctx context.Context) (VoiceSettings, error) {
 	var voiceSettings VoiceSettings
 	b := bytes.Buffer{}
-	err := c.doRequest(c.ctx, &b, http.MethodGet, fmt.Sprintf("%s/voices/settings/default", c.baseURL), &bytes.Buffer{}, contentTypeJSON)
+	err := c.doRequest(ctx, &b, http.MethodGet, fmt.Sprintf("%s/voices/settings/default", c.baseURL), &bytes.Buffer{}, contentTypeJSON)
 	if err != nil {
 		return VoiceSettings{}, err
 	}
@@ -366,10 +364,10 @@ func (c *Client) GetDefaultVoiceSettings() (VoiceSettings, error) {
 // It takes a string argument that represents the ID of the voice for which the settings are retrieved.
 //
 // It returns a VoiceSettings object or an error.
-func (c *Client) GetVoiceSettings(voiceId string) (VoiceSettings, error) {
+func (c *Client) GetVoiceSettings(ctx context.Context, voiceId string) (VoiceSettings, error) {
 	var voiceSettings VoiceSettings
 	b := bytes.Buffer{}
-	err := c.doRequest(c.ctx, &b, http.MethodGet, fmt.Sprintf("%s/voices/%s/settings", c.baseURL, voiceId), &bytes.Buffer{}, contentTypeJSON)
+	err := c.doRequest(ctx, &b, http.MethodGet, fmt.Sprintf("%s/voices/%s/settings", c.baseURL, voiceId), &bytes.Buffer{}, contentTypeJSON)
 	if err != nil {
 		return VoiceSettings{}, err
 	}
@@ -388,10 +386,10 @@ func (c *Client) GetVoiceSettings(voiceId string) (VoiceSettings, error) {
 // function is WithSettings.
 //
 // It returns a Voice object or an error.
-func (c *Client) GetVoice(voiceId string, queries ...QueryFunc) (Voice, error) {
+func (c *Client) GetVoice(ctx context.Context, voiceId string, queries ...QueryFunc) (Voice, error) {
 	var voice Voice
 	b := bytes.Buffer{}
-	err := c.doRequest(c.ctx, &b, http.MethodGet, fmt.Sprintf("%s/voices/%s", c.baseURL, voiceId), &bytes.Buffer{}, contentTypeJSON, queries...)
+	err := c.doRequest(ctx, &b, http.MethodGet, fmt.Sprintf("%s/voices/%s", c.baseURL, voiceId), &bytes.Buffer{}, contentTypeJSON, queries...)
 	if err != nil {
 		return Voice{}, err
 	}
@@ -408,8 +406,8 @@ func (c *Client) GetVoice(voiceId string, queries ...QueryFunc) (Voice, error) {
 // It takes a string argument that represents the ID of the voice to be deleted.
 //
 // It returns a nil if successful, or an error.
-func (c *Client) DeleteVoice(voiceId string) error {
-	return c.doRequest(c.ctx, &bytes.Buffer{}, http.MethodDelete, fmt.Sprintf("%s/voices/%s", c.baseURL, voiceId), &bytes.Buffer{}, contentTypeJSON)
+func (c *Client) DeleteVoice(ctx context.Context, voiceId string) error {
+	return c.doRequest(ctx, &bytes.Buffer{}, http.MethodDelete, fmt.Sprintf("%s/voices/%s", c.baseURL, voiceId), &bytes.Buffer{}, contentTypeJSON)
 }
 
 // EditVoiceSettings updates the settings for a specific voice.
@@ -418,13 +416,13 @@ func (c *Client) DeleteVoice(voiceId string) error {
 // updated belong, and a VoiceSettings argument that contains the new settings to be applied.
 //
 // It returns nil if successful or an error otherwise.
-func (c *Client) EditVoiceSettings(voiceId string, settings VoiceSettings) error {
+func (c *Client) EditVoiceSettings(ctx context.Context, voiceId string, settings VoiceSettings) error {
 	reqBody, err := json.Marshal(settings)
 	if err != nil {
 		return err
 	}
 
-	return c.doRequest(c.ctx, &bytes.Buffer{}, http.MethodPost, fmt.Sprintf("%s/voices/%s/settings/edit", c.baseURL, voiceId), bytes.NewBuffer(reqBody), contentTypeJSON)
+	return c.doRequest(ctx, &bytes.Buffer{}, http.MethodPost, fmt.Sprintf("%s/voices/%s/settings/edit", c.baseURL, voiceId), bytes.NewBuffer(reqBody), contentTypeJSON)
 }
 
 // AddVoice adds a new voice to the user's VoiceLab.
@@ -432,13 +430,13 @@ func (c *Client) EditVoiceSettings(voiceId string, settings VoiceSettings) error
 // It takes an AddEditVoiceRequest argument that contains the information of the voice to be added.
 //
 // It returns the ID of the newly added voice, or an error.
-func (c *Client) AddVoice(voiceReq AddEditVoiceRequest) (string, error) {
+func (c *Client) AddVoice(ctx context.Context, voiceReq AddEditVoiceRequest) (string, error) {
 	reqBodyBuf, contentType, err := voiceReq.buildRequestBody()
 	if err != nil {
 		return "", err
 	}
 	b := bytes.Buffer{}
-	err = c.doRequest(c.ctx, &b, http.MethodPost, fmt.Sprintf("%s/voices/add", c.baseURL), reqBodyBuf, contentType)
+	err = c.doRequest(ctx, &b, http.MethodPost, fmt.Sprintf("%s/voices/add", c.baseURL), reqBodyBuf, contentType)
 	if err != nil {
 		return "", err
 	}
@@ -455,12 +453,12 @@ func (c *Client) AddVoice(voiceReq AddEditVoiceRequest) (string, error) {
 // and an AddEditVoiceRequest argument 'voiceReq' that contains the updated information for the voice.
 //
 // It returns nil if successful or an error otherwise.
-func (c *Client) EditVoice(voiceId string, voiceReq AddEditVoiceRequest) error {
+func (c *Client) EditVoice(ctx context.Context, voiceId string, voiceReq AddEditVoiceRequest) error {
 	reqBodyBuf, contentType, err := voiceReq.buildRequestBody()
 	if err != nil {
 		return err
 	}
-	return c.doRequest(c.ctx, &bytes.Buffer{}, http.MethodPost, fmt.Sprintf("%s/voices/%s/edit", c.baseURL, voiceId), reqBodyBuf, contentType)
+	return c.doRequest(ctx, &bytes.Buffer{}, http.MethodPost, fmt.Sprintf("%s/voices/%s/edit", c.baseURL, voiceId), reqBodyBuf, contentType)
 }
 
 // DeleteSample deletes a sample associated with a specific voice.
@@ -469,8 +467,8 @@ func (c *Client) EditVoice(voiceId string, voiceReq AddEditVoiceRequest) error {
 // and the ID of the sample to be deleted respectively.
 //
 // It returns nil if successful or an error otherwise.
-func (c *Client) DeleteSample(voiceId, sampleId string) error {
-	return c.doRequest(c.ctx, &bytes.Buffer{}, http.MethodDelete, fmt.Sprintf("%s/voices/%s/samples/%s", c.baseURL, voiceId, sampleId), &bytes.Buffer{}, contentTypeJSON)
+func (c *Client) DeleteSample(ctx context.Context, voiceId, sampleId string) error {
+	return c.doRequest(ctx, &bytes.Buffer{}, http.MethodDelete, fmt.Sprintf("%s/voices/%s/samples/%s", c.baseURL, voiceId, sampleId), &bytes.Buffer{}, contentTypeJSON)
 }
 
 // GetSampleAudio retrieves the audio data for a specific sample associated with a voice.
@@ -478,9 +476,9 @@ func (c *Client) DeleteSample(voiceId, sampleId string) error {
 // It takes two string arguments representing the IDs of the voice and sample respectively.
 //
 // It returns a byte slice containing the audio data in case of success or an error.
-func (c *Client) GetSampleAudio(voiceId, sampleId string) ([]byte, error) {
+func (c *Client) GetSampleAudio(ctx context.Context, voiceId, sampleId string) ([]byte, error) {
 	b := bytes.Buffer{}
-	err := c.doRequest(c.ctx, &b, http.MethodGet, fmt.Sprintf("%s/voices/%s/samples/%s/audio", c.baseURL, voiceId, sampleId), &bytes.Buffer{}, contentTypeJSON)
+	err := c.doRequest(ctx, &b, http.MethodGet, fmt.Sprintf("%s/voices/%s/samples/%s/audio", c.baseURL, voiceId, sampleId), &bytes.Buffer{}, contentTypeJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -495,7 +493,7 @@ func (c *Client) GetSampleAudio(voiceId, sampleId string) ([]byte, error) {
 //
 // As such, a "while"-style for loop or recursive calls to the returned NextHistoryPageFunc can be employed
 // to retrieve all history in a paginated way if needed.
-type NextHistoryPageFunc func(...QueryFunc) (GetHistoryResponse, NextHistoryPageFunc, error)
+type NextHistoryPageFunc func(context.Context, ...QueryFunc) (GetHistoryResponse, NextHistoryPageFunc, error)
 
 // GetHistory retrieves the history of all created audio and their metadata
 //
@@ -504,10 +502,10 @@ type NextHistoryPageFunc func(...QueryFunc) (GetHistoryResponse, NextHistoryPage
 //
 // It returns a GetHistoryResponse object containing the history data, a function of type NextHistoryPageFunc
 // to retrieve the next page of history, and an error.
-func (c *Client) GetHistory(queries ...QueryFunc) (GetHistoryResponse, NextHistoryPageFunc, error) {
+func (c *Client) GetHistory(ctx context.Context, queries ...QueryFunc) (GetHistoryResponse, NextHistoryPageFunc, error) {
 	var historyResp GetHistoryResponse
 	b := bytes.Buffer{}
-	err := c.doRequest(c.ctx, &b, http.MethodGet, fmt.Sprintf("%s/history", c.baseURL), &bytes.Buffer{}, contentTypeJSON, queries...)
+	err := c.doRequest(ctx, &b, http.MethodGet, fmt.Sprintf("%s/history", c.baseURL), &bytes.Buffer{}, contentTypeJSON, queries...)
 	if err != nil {
 		return GetHistoryResponse{}, nil, err
 	}
@@ -520,10 +518,10 @@ func (c *Client) GetHistory(queries ...QueryFunc) (GetHistoryResponse, NextHisto
 		return historyResp, nil, nil
 	}
 
-	nextPageFunc := func(qf ...QueryFunc) (GetHistoryResponse, NextHistoryPageFunc, error) {
+	nextPageFunc := func(ctx context.Context, qf ...QueryFunc) (GetHistoryResponse, NextHistoryPageFunc, error) {
 		//TODO copy to new slice to avoid unexpected issues if query changes after few calls.
 		qf = append(queries, append(qf, StartAfter(historyResp.LastHistoryItemId))...)
-		return c.GetHistory(qf...)
+		return c.GetHistory(ctx, qf...)
 	}
 	return historyResp, nextPageFunc, nil
 }
@@ -533,10 +531,10 @@ func (c *Client) GetHistory(queries ...QueryFunc) (GetHistoryResponse, NextHisto
 // It takes a string argument 'representing the ID of the history item to be retrieved.
 //
 // It returns a HistoryItem object representing the retrieved history item, or an error.
-func (c *Client) GetHistoryItem(itemId string) (HistoryItem, error) {
+func (c *Client) GetHistoryItem(ctx context.Context, itemId string) (HistoryItem, error) {
 	var historyItem HistoryItem
 	b := bytes.Buffer{}
-	err := c.doRequest(c.ctx, &b, http.MethodGet, fmt.Sprintf("%s/history/%s", c.baseURL, itemId), &bytes.Buffer{}, contentTypeJSON)
+	err := c.doRequest(ctx, &b, http.MethodGet, fmt.Sprintf("%s/history/%s", c.baseURL, itemId), &bytes.Buffer{}, contentTypeJSON)
 	if err != nil {
 		return HistoryItem{}, err
 	}
@@ -553,8 +551,8 @@ func (c *Client) GetHistoryItem(itemId string) (HistoryItem, error) {
 // It takes a string argument representing the ID of the history item to be deleted.
 //
 // It returns nil if successful or an error otherwise.
-func (c *Client) DeleteHistoryItem(itemId string) error {
-	return c.doRequest(c.ctx, &bytes.Buffer{}, http.MethodDelete, fmt.Sprintf("%s/history/%s", c.baseURL, itemId), &bytes.Buffer{}, contentTypeJSON)
+func (c *Client) DeleteHistoryItem(ctx context.Context, itemId string) error {
+	return c.doRequest(ctx, &bytes.Buffer{}, http.MethodDelete, fmt.Sprintf("%s/history/%s", c.baseURL, itemId), &bytes.Buffer{}, contentTypeJSON)
 }
 
 // GetHistoryItemAudio retrieves the audio data for a specific history item by its ID.
@@ -563,9 +561,9 @@ func (c *Client) DeleteHistoryItem(itemId string) error {
 // data is retrieved.
 //
 // It returns a byte slice containing the audio data or an error.
-func (c *Client) GetHistoryItemAudio(itemId string) ([]byte, error) {
+func (c *Client) GetHistoryItemAudio(ctx context.Context, itemId string) ([]byte, error) {
 	b := bytes.Buffer{}
-	err := c.doRequest(c.ctx, &b, http.MethodGet, fmt.Sprintf("%s/history/%s/audio", c.baseURL, itemId), &bytes.Buffer{}, contentTypeJSON)
+	err := c.doRequest(ctx, &b, http.MethodGet, fmt.Sprintf("%s/history/%s/audio", c.baseURL, itemId), &bytes.Buffer{}, contentTypeJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -579,14 +577,14 @@ func (c *Client) GetHistoryItemAudio(itemId string) ([]byte, error) {
 // It returns a byte slice containing the downloaded audio data. If one history item ID was provided
 // the byte slice is a mpeg encoded audio file. If multiple item IDs where provided, the byte slice
 // is a zip file packing the history items' audio files.
-func (c *Client) DownloadHistoryAudio(dlReq DownloadHistoryRequest) ([]byte, error) {
+func (c *Client) DownloadHistoryAudio(ctx context.Context, dlReq DownloadHistoryRequest) ([]byte, error) {
 	reqBody, err := json.Marshal(dlReq)
 	if err != nil {
 		return nil, err
 	}
 
 	b := bytes.Buffer{}
-	err = c.doRequest(c.ctx, &b, http.MethodPost, fmt.Sprintf("%s/history/download", c.baseURL), bytes.NewBuffer(reqBody), contentTypeJSON)
+	err = c.doRequest(ctx, &b, http.MethodPost, fmt.Sprintf("%s/history/download", c.baseURL), bytes.NewBuffer(reqBody), contentTypeJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -596,10 +594,10 @@ func (c *Client) DownloadHistoryAudio(dlReq DownloadHistoryRequest) ([]byte, err
 // GetSubscription retrieves the subscription details for the user.
 //
 // It returns a Subscription object representing the subscription details, or an error.
-func (c *Client) GetSubscription() (Subscription, error) {
+func (c *Client) GetSubscription(ctx context.Context) (Subscription, error) {
 	sub := Subscription{}
 	b := bytes.Buffer{}
-	err := c.doRequest(c.ctx, &b, http.MethodGet, fmt.Sprintf("%s/user/subscription", c.baseURL), &bytes.Buffer{}, contentTypeJSON)
+	err := c.doRequest(ctx, &b, http.MethodGet, fmt.Sprintf("%s/user/subscription", c.baseURL), &bytes.Buffer{}, contentTypeJSON)
 	if err != nil {
 		return sub, err
 	}
@@ -617,10 +615,10 @@ func (c *Client) GetSubscription() (Subscription, error) {
 //
 // The Subscription object returned with User will not have the invoicing details populated.
 // Use GetSubscription to retrieve the user's full subscription details.
-func (c *Client) GetUser() (User, error) {
+func (c *Client) GetUser(ctx context.Context) (User, error) {
 	user := User{}
 	b := bytes.Buffer{}
-	err := c.doRequest(c.ctx, &b, http.MethodGet, fmt.Sprintf("%s/user", c.baseURL), &bytes.Buffer{}, contentTypeJSON)
+	err := c.doRequest(ctx, &b, http.MethodGet, fmt.Sprintf("%s/user", c.baseURL), &bytes.Buffer{}, contentTypeJSON)
 	if err != nil {
 		return user, err
 	}
