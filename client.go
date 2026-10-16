@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -117,8 +118,10 @@ func (c *Client) requestClient() *http.Client {
 // status is returned typed: a 400 or 401 whose body decodes as the API's error is an [*APIError], a
 // 422 whose body decodes as the API's validation error is a [*ValidationError], and every other
 // unsuccessful response is a [*StatusError], whose Err holds the decode failure of a 400, 401 or
-// 422 body that did not decode. Each carries the response's StatusCode.
-func (c *Client) doRequest(ctx context.Context, RespBodyWriter io.Writer, method, url string, bodyBuf io.Reader, contentType string, queries ...QueryFunc) error {
+// 422 body that did not decode. Each carries the response's StatusCode. A failure to close the
+// response body is returned as a [*BodyCloseError]: alone when everything else succeeded, otherwise
+// joined behind the earlier error.
+func (c *Client) doRequest(ctx context.Context, RespBodyWriter io.Writer, method, url string, bodyBuf io.Reader, contentType string, queries ...QueryFunc) (err error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(timeoutCtx, method, url, bodyBuf)
@@ -144,7 +147,16 @@ func (c *Client) doRequest(ctx context.Context, RespBodyWriter io.Writer, method
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			ce := &BodyCloseError{Err: cerr}
+			if err == nil {
+				err = ce
+			} else {
+				err = errors.Join(err, ce)
+			}
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, err := io.ReadAll(resp.Body)

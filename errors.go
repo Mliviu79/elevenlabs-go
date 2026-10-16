@@ -75,3 +75,20 @@ func (e *StatusError) Error() string {
 
 // Unwrap returns the body's decode failure, or nil when the client did not decode the body.
 func (e *StatusError) Unwrap() error { return e.Err }
+
+// BodyCloseError reports that the response body could not be closed after a request. A request
+// returns it alone when everything else succeeded, and otherwise joins it behind the request's
+// earlier error (a transport or cancellation error, an unsuccessful status, or a failure to write
+// the body), so [errors.Is] and [errors.As] match both. Err is the error Close returned.
+type BodyCloseError struct {
+	Err error
+}
+
+func (e *BodyCloseError) Error() string {
+	return "close response body: " + e.Err.Error()
+}
+
+// Unwrap returns the error Close returned.
+func (e *BodyCloseError) Unwrap() error {
+	return e.Err
+}
