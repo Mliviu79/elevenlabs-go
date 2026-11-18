@@ -2,9 +2,14 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"maps"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -164,4 +169,60 @@ func TestGenFuncFromMethod(t *testing.T) {
 
 		})
 	}
+}
+
+// TestParsePackage runs parsePackage over a directory holding, beside two files of the wanted
+// package, everything it has to leave out: a file of another package, an excluded file, a file
+// that is not Go source, and a directory whose name ends in .go.
+func TestParsePackage(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"b.go":        "package wanted\n",
+		"a.go":        "package wanted\n",
+		"other.go":    "package other\n",
+		"excluded.go": "package wanted\n",
+		"notes.txt":   "package wanted\n",
+		"a_test.go":   "package wanted_test\n",
+		"in_test.go":  "package wanted\n",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("writing %s: %v", name, err)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(dir, "dir.go"), 0o700); err != nil {
+		t.Fatalf("creating a directory named like a Go file: %v", err)
+	}
+
+	t.Run("returns the files of the package", func(t *testing.T) {
+		pkgFiles, err := parsePackage("wanted", dir, []string{"excluded.go"})
+		if err != nil {
+			t.Fatalf("parsePackage() error = %v, want nil", err)
+		}
+		got := slices.Sorted(maps.Keys(pkgFiles))
+		want := []string{filepath.Join(dir, "a.go"), filepath.Join(dir, "b.go"), filepath.Join(dir, "in_test.go")}
+		if !slices.Equal(got, want) {
+			t.Errorf("parsePackage() files = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("reports a package no file declares", func(t *testing.T) {
+		pkgFiles, err := parsePackage("missing", dir, nil)
+		if !errors.Is(err, errPackageNotFound) {
+			t.Errorf("parsePackage() error = %v, want it to match errPackageNotFound", err)
+		}
+		if pkgFiles != nil {
+			t.Errorf("parsePackage() files = %v beside an error, want nil", pkgFiles)
+		}
+	})
+
+	t.Run("reports a file that does not parse", func(t *testing.T) {
+		broken := t.TempDir()
+		if err := os.WriteFile(filepath.Join(broken, "broken.go"), []byte("package\n"), 0o600); err != nil {
+			t.Fatalf("writing broken.go: %v", err)
+		}
+		if _, err := parsePackage("wanted", broken, nil); err == nil || errors.Is(err, errPackageNotFound) {
+			t.Errorf("parsePackage() error = %v, want the parse failure", err)
+		}
+	})
 }
