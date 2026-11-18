@@ -2,6 +2,7 @@ package elevenlabs_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -143,4 +144,71 @@ func ExampleClient_TextToSpeechStreamWithTimestamps() {
 	}
 
 	log.Println("Successfully generated audio with timestamps")
+}
+
+func ExampleSpeechToTextRealtimeOptions_Query() {
+	// A nil pointer leaves a parameter out; a set one is sent, false included.
+	includeTimestamps := true
+	options := elevenlabs.SpeechToTextRealtimeOptions{
+		ModelID:           "scribe_v2_realtime",
+		AudioFormat:       "pcm_16000",
+		CommitStrategy:    "vad",
+		IncludeTimestamps: &includeTimestamps,
+		Keyterms:          []string{"ElevenLabs", "Scribe"},
+	}
+
+	// Dial this URL with a WebSocket library, sending the API key in the
+	// xi-api-key header of the handshake.
+	fmt.Println(elevenlabs.SpeechToTextRealtimeURL + "?" + options.Query().Encode())
+	// Output: wss://api.elevenlabs.io/v1/speech-to-text/realtime?audio_format=pcm_16000&commit_strategy=vad&include_timestamps=true&keyterms=ElevenLabs&keyterms=Scribe&model_id=scribe_v2_realtime
+}
+
+func ExampleSpeechToTextRealtimeAudioChunk() {
+	// Send audio as it becomes available
+	audioMessage, err := json.Marshal(elevenlabs.SpeechToTextRealtimeAudioChunk{
+		Audio:      []byte("pcm"),
+		SampleRate: 16000,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(audioMessage))
+
+	// Commit the segment without sending more audio
+	commitMessage, err := json.Marshal(elevenlabs.SpeechToTextRealtimeAudioChunk{
+		Commit:     true,
+		SampleRate: 16000,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(commitMessage))
+	// Output:
+	// {"message_type":"input_audio_chunk","audio_base_64":"cGNt","commit":false,"sample_rate":16000}
+	// {"message_type":"input_audio_chunk","audio_base_64":"","commit":true,"sample_rate":16000}
+}
+
+func ExampleSpeechToTextRealtimeEvent_Err() {
+	// Two text messages as the server sends them
+	messages := []string{
+		`{"message_type":"committed_transcript","text":"Hello, world."}`,
+		`{"message_type":"auth_error","error":"Invalid API key."}`,
+	}
+
+	for _, message := range messages {
+		var event elevenlabs.SpeechToTextRealtimeEvent
+		if err := json.Unmarshal([]byte(message), &event); err != nil {
+			log.Fatal(err)
+		}
+
+		// Check for a server error before using the event
+		if err := event.Err(); err != nil {
+			fmt.Println("server error:", err)
+			continue
+		}
+		fmt.Printf("%s: %s\n", event.MessageType, event.Text)
+	}
+	// Output:
+	// committed_transcript: Hello, world.
+	// server error: speech-to-text realtime auth_error: Invalid API key.
 }
