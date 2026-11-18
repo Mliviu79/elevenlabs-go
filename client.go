@@ -270,7 +270,7 @@ func StartAfter(id string) QueryFunc {
 func (c *Client) TextToSpeech(ctx context.Context, voiceID string, ttsReq TextToSpeechRequest, queries ...QueryFunc) ([]byte, error) {
 	reqBody, err := json.Marshal(ttsReq)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("encode text-to-speech request: %w", err)
 	}
 	b := bytes.Buffer{}
 	err = c.doRequest(ctx, &b, http.MethodPost, fmt.Sprintf("%s/text-to-speech/%s", c.baseURL, voiceID), bytes.NewBuffer(reqBody), contentTypeJSON, queries...)
@@ -293,7 +293,7 @@ func (c *Client) TextToSpeech(ctx context.Context, voiceID string, ttsReq TextTo
 func (c *Client) TextToSpeechStream(ctx context.Context, streamWriter io.Writer, voiceID string, ttsReq TextToSpeechRequest, queries ...QueryFunc) error {
 	reqBody, err := json.Marshal(ttsReq)
 	if err != nil {
-		return err
+		return fmt.Errorf("encode text-to-speech request: %w", err)
 	}
 
 	return c.doRequest(ctx, streamWriter, http.MethodPost, fmt.Sprintf("%s/text-to-speech/%s/stream", c.baseURL, voiceID), bytes.NewBuffer(reqBody), contentTypeJSON, queries...)
@@ -315,7 +315,7 @@ func (c *Client) TextToSpeechStream(ctx context.Context, streamWriter io.Writer,
 func (c *Client) TextToSpeechStreamWithTimestamps(ctx context.Context, streamWriter io.Writer, voiceID string, ttsReq TextToSpeechRequest, queries ...QueryFunc) error {
 	reqBody, err := json.Marshal(ttsReq)
 	if err != nil {
-		return err
+		return fmt.Errorf("encode text-to-speech request: %w", err)
 	}
 
 	return c.doRequest(ctx, streamWriter, http.MethodPost, fmt.Sprintf("%s/text-to-speech/%s/stream/with-timestamps", c.baseURL, voiceID), bytes.NewBuffer(reqBody), contentTypeJSON, queries...)
@@ -333,7 +333,7 @@ func (c *Client) GetModels(ctx context.Context) ([]Model, error) {
 
 	var models []Model
 	if err := json.Unmarshal(b.Bytes(), &models); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode models: %w", err)
 	}
 
 	return models, nil
@@ -351,7 +351,7 @@ func (c *Client) GetVoices(ctx context.Context) ([]Voice, error) {
 
 	var voiceResp GetVoicesResponse
 	if err := json.Unmarshal(b.Bytes(), &voiceResp); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode voices: %w", err)
 	}
 
 	return voiceResp.Voices, nil
@@ -369,7 +369,7 @@ func (c *Client) GetDefaultVoiceSettings(ctx context.Context) (VoiceSettings, er
 	}
 
 	if err := json.Unmarshal(b.Bytes(), &voiceSettings); err != nil {
-		return VoiceSettings{}, err
+		return VoiceSettings{}, fmt.Errorf("decode default voice settings: %w", err)
 	}
 
 	return voiceSettings, nil
@@ -389,7 +389,7 @@ func (c *Client) GetVoiceSettings(ctx context.Context, voiceId string) (VoiceSet
 	}
 
 	if err := json.Unmarshal(b.Bytes(), &voiceSettings); err != nil {
-		return VoiceSettings{}, err
+		return VoiceSettings{}, fmt.Errorf("decode voice settings: %w", err)
 	}
 
 	return voiceSettings, nil
@@ -411,7 +411,7 @@ func (c *Client) GetVoice(ctx context.Context, voiceId string, queries ...QueryF
 	}
 
 	if err := json.Unmarshal(b.Bytes(), &voice); err != nil {
-		return Voice{}, err
+		return Voice{}, fmt.Errorf("decode voice: %w", err)
 	}
 
 	return voice, nil
@@ -435,7 +435,7 @@ func (c *Client) DeleteVoice(ctx context.Context, voiceId string) error {
 func (c *Client) EditVoiceSettings(ctx context.Context, voiceId string, settings VoiceSettings) error {
 	reqBody, err := json.Marshal(settings)
 	if err != nil {
-		return err
+		return fmt.Errorf("encode voice settings: %w", err)
 	}
 
 	return c.doRequest(ctx, &bytes.Buffer{}, http.MethodPost, fmt.Sprintf("%s/voices/%s/settings/edit", c.baseURL, voiceId), bytes.NewBuffer(reqBody), contentTypeJSON)
@@ -458,7 +458,7 @@ func (c *Client) AddVoice(ctx context.Context, voiceReq AddEditVoiceRequest) (st
 	}
 	var voiceResp AddVoiceResponse
 	if err := json.Unmarshal(b.Bytes(), &voiceResp); err != nil {
-		return "", err
+		return "", fmt.Errorf("decode added voice: %w", err)
 	}
 	return voiceResp.VoiceId, nil
 }
@@ -527,7 +527,7 @@ func (c *Client) GetHistory(ctx context.Context, queries ...QueryFunc) (GetHisto
 	}
 
 	if err := json.Unmarshal(b.Bytes(), &historyResp); err != nil {
-		return GetHistoryResponse{}, nil, err
+		return GetHistoryResponse{}, nil, fmt.Errorf("decode history: %w", err)
 	}
 
 	if !historyResp.HasMore {
@@ -556,7 +556,7 @@ func (c *Client) GetHistoryItem(ctx context.Context, itemId string) (HistoryItem
 	}
 
 	if err := json.Unmarshal(b.Bytes(), &historyItem); err != nil {
-		return HistoryItem{}, err
+		return HistoryItem{}, fmt.Errorf("decode history item: %w", err)
 	}
 
 	return historyItem, nil
@@ -596,7 +596,7 @@ func (c *Client) GetHistoryItemAudio(ctx context.Context, itemId string) ([]byte
 func (c *Client) DownloadHistoryAudio(ctx context.Context, dlReq DownloadHistoryRequest) ([]byte, error) {
 	reqBody, err := json.Marshal(dlReq)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("encode history download request: %w", err)
 	}
 
 	b := bytes.Buffer{}
@@ -619,7 +619,7 @@ func (c *Client) GetSubscription(ctx context.Context) (Subscription, error) {
 	}
 
 	if err := json.Unmarshal(b.Bytes(), &sub); err != nil {
-		return sub, err
+		return sub, fmt.Errorf("decode subscription: %w", err)
 	}
 
 	return sub, nil
@@ -640,7 +640,7 @@ func (c *Client) GetUser(ctx context.Context) (User, error) {
 	}
 
 	if err := json.Unmarshal(b.Bytes(), &user); err != nil {
-		return user, err
+		return user, fmt.Errorf("decode user: %w", err)
 	}
 
 	return user, nil

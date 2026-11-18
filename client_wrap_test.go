@@ -1,8 +1,10 @@
 package elevenlabs
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -97,4 +99,53 @@ func TestDoRequest_FailedStepIsNamed(t *testing.T) {
 		}
 		assertStepNamed(t, err, "copy response body")
 	})
+}
+
+// TestTextToSpeech_EncodeFailureIsNamed verifies that each text-to-speech method returns a request
+// it cannot encode as an error that still matches the encoder's and names the step in front.
+func TestTextToSpeech_EncodeFailureIsNamed(t *testing.T) {
+	// JSON has no encoding for NaN, so this request cannot be encoded.
+	nan := float32(math.NaN())
+	unencodable := TextToSpeechRequest{Text: "hello", VoiceSettings: &VoiceSettings{Stability: &nan}}
+	testCases := []struct {
+		name string
+		call func(t *testing.T, client *Client) error
+	}{
+		{
+			name: "TextToSpeech",
+			call: func(t *testing.T, client *Client) error {
+				_, err := client.TextToSpeech(t.Context(), testVoiceID, unencodable)
+				return err
+			},
+		},
+		{
+			name: "TextToSpeechStream",
+			call: func(t *testing.T, client *Client) error {
+				return client.TextToSpeechStream(t.Context(), io.Discard, testVoiceID, unencodable)
+			},
+		},
+		{
+			name: "TextToSpeechStreamWithTimestamps",
+			call: func(t *testing.T, client *Client) error {
+				return client.TextToSpeechStreamWithTimestamps(t.Context(), io.Discard, testVoiceID, unencodable)
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tr := &recordingTransport{}
+			client := NewMockClient(unservedBaseURL, testAPIKey, testRequestTimeout, WithHTTPClient(&http.Client{Transport: tr}))
+
+			err := tc.call(t, client)
+
+			var unsupported *json.UnsupportedValueError
+			if !errors.As(err, &unsupported) {
+				t.Errorf("error = %v, want it to carry the encoder's *json.UnsupportedValueError", err)
+			}
+			if served := tr.served(); len(served) != 0 {
+				t.Errorf("transport served %d requests, want none: the request could not be encoded", len(served))
+			}
+			assertStepNamed(t, err, "encode text-to-speech request")
+		})
+	}
 }
