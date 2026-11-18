@@ -404,18 +404,28 @@ func (e *SpeechToTextRealtimeError) Error() string {
 }
 
 // SpeechToTextRealtimeSessionConfig is the configuration a session_started event reports: the
-// settings the session runs with. A pointer member is nil when the event does not carry the
-// property.
+// settings the session runs with, as the API sends them. That is not the config schema of the API
+// reference: the API reports the commit strategy as vad_commit_strategy and logging as
+// disable_logging, and sends properties the schema does not list. A pointer member is nil when
+// the event does not carry the property or carries null.
 type SpeechToTextRealtimeSessionConfig struct {
 	// SampleRate is the sample_rate property, the sample rate of the audio in Hz.
 	SampleRate *int `json:"sample_rate"`
 	// AudioFormat is the audio_format property, the encoding of the audio, in the values of
 	// SpeechToTextRealtimeOptions.AudioFormat.
 	AudioFormat string `json:"audio_format"`
-	// LanguageCode is the language_code property, an ISO 639-1 or ISO 639-3 code.
+	// LanguageCode is the language_code property, the language the connection asked for. It is
+	// empty when the connection named none.
 	LanguageCode string `json:"language_code"`
-	// CommitStrategy is the commit_strategy property, the strategy that commits transcripts.
-	CommitStrategy string `json:"commit_strategy"`
+	// SecondaryLanguages is the secondary_languages property, the further languages the
+	// connection asked for.
+	SecondaryLanguages []string `json:"secondary_languages"`
+	// TimestampsGranularity is the timestamps_granularity property, such as "word".
+	TimestampsGranularity string `json:"timestamps_granularity"`
+	// VADCommitStrategy is the vad_commit_strategy property: true when the session commits on
+	// detected silence, as it does under the "vad" and "turn_prediction" strategies, and false
+	// under "manual".
+	VADCommitStrategy *bool `json:"vad_commit_strategy"`
 	// VADSilenceThresholdSecs is the vad_silence_threshold_secs property, the silence threshold
 	// in seconds.
 	VADSilenceThresholdSecs *float64 `json:"vad_silence_threshold_secs"`
@@ -427,31 +437,47 @@ type SpeechToTextRealtimeSessionConfig struct {
 	// MinSilenceDurationMs is the min_silence_duration_ms property, the minimum silence duration
 	// in milliseconds.
 	MinSilenceDurationMs *int `json:"min_silence_duration_ms"`
+	// MaxTokensToRecompute is the max_tokens_to_recompute property. The API's documentation does
+	// not describe it.
+	MaxTokensToRecompute *int `json:"max_tokens_to_recompute"`
 	// ModelID is the model_id property, the model that transcribes the session.
 	ModelID string `json:"model_id"`
-	// EnableLogging is the enable_logging property. False means the session runs in zero
-	// retention mode.
-	EnableLogging *bool `json:"enable_logging"`
+	// DisableLogging is the disable_logging property. True means the session runs in zero
+	// retention mode, which a connection asks for with EnableLogging set to false.
+	DisableLogging *bool `json:"disable_logging"`
 	// IncludeTimestamps is the include_timestamps property: whether the session sends word
 	// timings with its committed transcripts.
 	IncludeTimestamps *bool `json:"include_timestamps"`
 	// IncludeLanguageDetection is the include_language_detection property: whether the session
-	// sends the detected language with its committed transcripts.
+	// sends the detected language with its transcripts.
 	IncludeLanguageDetection *bool `json:"include_language_detection"`
+	// FilterBackgroundAudio is the filter_background_audio property: whether voice activity
+	// detection ignores background speech and ambient noise.
+	FilterBackgroundAudio *bool `json:"filter_background_audio"`
 	// Keyterms is the keyterms property, the terms the model is biased towards.
 	Keyterms []string `json:"keyterms"`
 	// NoVerbatim is the no_verbatim property: whether filler words and disfluencies are removed
 	// from the transcript.
 	NoVerbatim *bool `json:"no_verbatim"`
+	// EntityDetection is the entity_detection property: the entity types the session detects.
+	// The API expands a category the connection asked for, such as "pii", into its entity types.
+	// It is nil when entity detection is off.
+	EntityDetection []string `json:"entity_detection"`
+	// EntityRedaction is the entity_redaction property: the entity types the session redacts,
+	// expanded as EntityDetection is. It is nil when entity redaction is off.
+	EntityRedaction []string `json:"entity_redaction"`
+	// EntityRedactionMode is the entity_redaction_mode property, in the values of
+	// SpeechToTextRealtimeOptions.EntityRedactionMode.
+	EntityRedactionMode string `json:"entity_redaction_mode"`
 	// KeepaliveIntervalMs is the keepalive_interval_ms property, the interval in milliseconds at
 	// which the server sends keepalive partial transcripts. It is nil when keepalives are off.
 	KeepaliveIntervalMs *int `json:"keepalive_interval_ms"`
 }
 
-// SpeechToTextRealtimeWord is a word of a transcript. It decodes both word shapes the API sends:
-// the one of a committed_transcript_with_timestamps event, and the one of a diarized_transcript
-// event and of the draft words of a partial_transcript. A pointer member is nil when the word
-// does not carry the property or carries null.
+// SpeechToTextRealtimeWord is a word of a transcript, on a committed_transcript_with_timestamps
+// event, a diarized_transcript event, or among the draft words of a partial_transcript. It
+// decodes both word shapes of the API reference. A pointer member is nil when the word does not
+// carry the property or carries null.
 type SpeechToTextRealtimeWord struct {
 	// Text is the text property, the word or sound that was transcribed.
 	Text string `json:"text"`

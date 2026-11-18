@@ -249,79 +249,115 @@ func TestSpeechToTextRealtimeEventDecode(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			// SessionStarted and all 14 properties of MessagesSessionStartedConfig in the API
-			// reference. The VAD values 1.5, 0.4 and 100 are the example of "Transcripts and
-			// commit strategies"; the session id and the remaining values are this repository's.
-			name: "session_started",
-			payload: `{
-				"message_type": "session_started",
-				"session_id": "0b0a72b57fd743ecbd9ad8e0a3bbd00a",
-				"config": {
-					"sample_rate": 16000,
-					"audio_format": "pcm_16000",
-					"language_code": "en",
-					"commit_strategy": "vad",
-					"vad_silence_threshold_secs": 1.5,
-					"vad_threshold": 0.4,
-					"min_speech_duration_ms": 100,
-					"min_silence_duration_ms": 250,
-					"model_id": "scribe_v2_realtime",
-					"enable_logging": true,
-					"include_timestamps": true,
-					"include_language_detection": false,
-					"keyterms": ["ElevenLabs", "Scribe"],
-					"no_verbatim": false
-				}
-			}`,
+			// Captured from the API on 2026-11-18, verbatim: a scribe_v2_realtime session opened
+			// with a language, manual commits, timestamps and language detection. The config the
+			// API sends is not the MessagesSessionStartedConfig of its reference: it reports the
+			// commit strategy as vad_commit_strategy and logging as disable_logging, and carries
+			// properties that schema does not list.
+			name:    "session_started as scribe_v2_realtime sent it",
+			payload: `{"message_type":"session_started","session_id":"be637500ff9647d48d7e071d9b1c2a19","config":{"sample_rate":16000,"audio_format":"pcm_16000","language_code":"ro","secondary_languages":[],"timestamps_granularity":"word","vad_commit_strategy":false,"vad_silence_threshold_secs":1.5,"vad_threshold":0.4,"min_speech_duration_ms":100,"min_silence_duration_ms":100,"max_tokens_to_recompute":5,"model_id":"scribe_v2_realtime","disable_logging":false,"include_timestamps":true,"include_language_detection":true,"filter_background_audio":false,"keyterms":[],"no_verbatim":false,"entity_detection":null,"entity_redaction":null,"entity_redaction_mode":"enumerated_entity_type","keepalive_interval_ms":null}}`,
 			want: elevenlabs.SpeechToTextRealtimeEvent{
 				MessageType: elevenlabs.SpeechToTextRealtimeSessionStarted,
-				SessionID:   "0b0a72b57fd743ecbd9ad8e0a3bbd00a",
+				SessionID:   "be637500ff9647d48d7e071d9b1c2a19",
 				Config: &elevenlabs.SpeechToTextRealtimeSessionConfig{
 					SampleRate:               ptr(16000),
 					AudioFormat:              "pcm_16000",
-					LanguageCode:             "en",
-					CommitStrategy:           "vad",
+					LanguageCode:             "ro",
+					SecondaryLanguages:       []string{},
+					TimestampsGranularity:    "word",
+					VADCommitStrategy:        ptr(false),
 					VADSilenceThresholdSecs:  ptr(1.5),
 					VADThreshold:             ptr(0.4),
 					MinSpeechDurationMs:      ptr(100),
-					MinSilenceDurationMs:     ptr(250),
+					MinSilenceDurationMs:     ptr(100),
+					MaxTokensToRecompute:     ptr(5),
 					ModelID:                  "scribe_v2_realtime",
-					EnableLogging:            ptr(true),
+					DisableLogging:           ptr(false),
 					IncludeTimestamps:        ptr(true),
-					IncludeLanguageDetection: ptr(false),
-					Keyterms:                 []string{"ElevenLabs", "Scribe"},
+					IncludeLanguageDetection: ptr(true),
+					FilterBackgroundAudio:    ptr(false),
+					Keyterms:                 []string{},
 					NoVerbatim:               ptr(false),
+					EntityRedactionMode:      "enumerated_entity_type",
 				},
 			},
 		},
 		{
-			// "Transcripts and commit strategies" says the config echoes keepalive_interval_ms,
-			// which the API reference's schema does not list. The property after it is this
-			// repository's invention: a property the package does not know decodes without
-			// error. The four booleans are the reverse pattern of the case above, so between
-			// them the two cases tell each boolean from the other three.
-			name: "session_started with the keepalive echo and an unknown config property",
+			// Captured from the API on 2026-11-18, verbatim: a scribe_v3_live session opened
+			// without a language, with VAD commits, a 0.5 s silence threshold, keepalives every
+			// 1000 ms, language detection and one keyterm. language_code is null.
+			name:    "session_started as scribe_v3_live sent it",
+			payload: `{"message_type":"session_started","session_id":"7c1b7d800fc2429eba98c95d14bccbaa","config":{"sample_rate":16000,"audio_format":"pcm_16000","language_code":null,"secondary_languages":[],"timestamps_granularity":"word","vad_commit_strategy":true,"vad_silence_threshold_secs":0.5,"vad_threshold":0.4,"min_speech_duration_ms":100,"min_silence_duration_ms":100,"max_tokens_to_recompute":5,"model_id":"scribe_v3_live","disable_logging":false,"include_timestamps":false,"include_language_detection":true,"filter_background_audio":false,"keyterms":["programare"],"no_verbatim":false,"entity_detection":null,"entity_redaction":null,"entity_redaction_mode":"enumerated_entity_type","keepalive_interval_ms":1000}}`,
+			want: elevenlabs.SpeechToTextRealtimeEvent{
+				MessageType: elevenlabs.SpeechToTextRealtimeSessionStarted,
+				SessionID:   "7c1b7d800fc2429eba98c95d14bccbaa",
+				Config: &elevenlabs.SpeechToTextRealtimeSessionConfig{
+					SampleRate:               ptr(16000),
+					AudioFormat:              "pcm_16000",
+					SecondaryLanguages:       []string{},
+					TimestampsGranularity:    "word",
+					VADCommitStrategy:        ptr(true),
+					VADSilenceThresholdSecs:  ptr(0.5),
+					VADThreshold:             ptr(0.4),
+					MinSpeechDurationMs:      ptr(100),
+					MinSilenceDurationMs:     ptr(100),
+					MaxTokensToRecompute:     ptr(5),
+					ModelID:                  "scribe_v3_live",
+					DisableLogging:           ptr(false),
+					IncludeTimestamps:        ptr(false),
+					IncludeLanguageDetection: ptr(true),
+					FilterBackgroundAudio:    ptr(false),
+					Keyterms:                 []string{"programare"},
+					NoVerbatim:               ptr(false),
+					EntityRedactionMode:      "enumerated_entity_type",
+					KeepaliveIntervalMs:      ptr(1000),
+				},
+			},
+		},
+		{
+			// Derived by hand from captures of 2026-11-18. The API echoed secondary_languages as
+			// sent, and echoed entity_detection and entity_redaction of "pii" as the list of the
+			// 45 entity types of that category, shortened here to its first three. Set by hand to
+			// the value no capture carried: disable_logging, no_verbatim, filter_background_audio
+			// and include_timestamps, so that between this case and the two above every boolean
+			// is told from the others. a_property_added_later is this repository's invention: a
+			// property the package does not know decodes without error.
+			name: "session_started with entity lists, secondary languages and an unknown property",
 			payload: `{
 				"message_type": "session_started",
-				"session_id": "5c1f0d3a9b6e4a27a1c8d2e4f6a8b0c2",
+				"session_id": "2c72f4c33cb84df08ea073fdf728fe95",
 				"config": {
-					"keepalive_interval_ms": 1000,
+					"sample_rate": 8000,
+					"audio_format": "ulaw_8000",
+					"language_code": "ro",
+					"secondary_languages": ["en", "hu"],
 					"a_property_added_later": "ignored",
-					"enable_logging": true,
-					"include_timestamps": false,
-					"include_language_detection": true,
-					"no_verbatim": false
+					"disable_logging": true,
+					"include_timestamps": true,
+					"include_language_detection": false,
+					"filter_background_audio": true,
+					"no_verbatim": true,
+					"entity_detection": ["account_number", "age", "bank_account"],
+					"entity_redaction": ["account_number", "age", "bank_account"],
+					"entity_redaction_mode": "entity_type"
 				}
 			}`,
 			want: elevenlabs.SpeechToTextRealtimeEvent{
 				MessageType: elevenlabs.SpeechToTextRealtimeSessionStarted,
-				SessionID:   "5c1f0d3a9b6e4a27a1c8d2e4f6a8b0c2",
+				SessionID:   "2c72f4c33cb84df08ea073fdf728fe95",
 				Config: &elevenlabs.SpeechToTextRealtimeSessionConfig{
-					KeepaliveIntervalMs:      ptr(1000),
-					EnableLogging:            ptr(true),
-					IncludeTimestamps:        ptr(false),
-					IncludeLanguageDetection: ptr(true),
-					NoVerbatim:               ptr(false),
+					SampleRate:               ptr(8000),
+					AudioFormat:              "ulaw_8000",
+					LanguageCode:             "ro",
+					SecondaryLanguages:       []string{"en", "hu"},
+					DisableLogging:           ptr(true),
+					IncludeTimestamps:        ptr(true),
+					IncludeLanguageDetection: ptr(false),
+					FilterBackgroundAudio:    ptr(true),
+					NoVerbatim:               ptr(true),
+					EntityDetection:          []string{"account_number", "age", "bank_account"},
+					EntityRedaction:          []string{"account_number", "age", "bank_account"},
+					EntityRedactionMode:      "entity_type",
 				},
 			},
 		},
