@@ -1,3 +1,7 @@
 .vscode
 .DS_Store
 coverage.out
+.planning/
+.claude/
+.agents/
+skills-lock.json
