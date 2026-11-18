@@ -103,6 +103,18 @@ func TestTextNormalizationMarshalsAsTheAPIString(t *testing.T) {
 	}
 }
 
+// TestVoiceEncodesItsSettingsKey verifies that a Voice always encodes its settings key: a voice
+// without settings carries an empty object, never a missing key.
+func TestVoiceEncodesItsSettingsKey(t *testing.T) {
+	encoded, err := json.Marshal(elevenlabs.Voice{})
+	if err != nil {
+		t.Fatalf("marshalling Voice: %v", err)
+	}
+	if got, want := decodeObject(t, encoded)["settings"], any(map[string]any{}); !reflect.DeepEqual(got, want) {
+		t.Errorf("zero Voice encoded settings as %v, want an empty object; body: %s", got, encoded)
+	}
+}
+
 // ptr returns a pointer to v, for building optional request fields in tests.
 func ptr[T any](v T) *T {
 	return &v
