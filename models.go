@@ -3,6 +3,7 @@ package elevenlabs
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -302,17 +303,11 @@ func (r *AddEditVoiceRequest) buildRequestBody() (*bytes.Buffer, string, error) 
 	}
 
 	for _, file := range r.FilePaths {
-		f, err := os.Open(file)
+		f, err := os.Open(file) //nolint:gosec // the caller names the files it uploads; opening them is this function's purpose
 		if err != nil {
 			return buildFailed(err)
 		}
-		defer f.Close()
-
-		fw, err := w.CreateFormFile("files", filepath.Base(file))
-		if err != nil {
-			return buildFailed(err)
-		}
-		if _, err = io.Copy(fw, f); err != nil {
+		if err = writeFilePart(w, filepath.Base(file), f); err != nil {
 			return buildFailed(err)
 		}
 	}
@@ -323,4 +318,20 @@ func (r *AddEditVoiceRequest) buildRequestBody() (*bytes.Buffer, string, error) 
 	}
 
 	return &b, w.FormDataContentType(), nil
+}
+
+// writeFilePart writes content into w as one part of the "files" field, named fileName, and
+// closes content on every path. A failure to close content is reported, joined behind any earlier
+// error.
+func writeFilePart(w *multipart.Writer, fileName string, content io.ReadCloser) (err error) {
+	defer func() { err = errors.Join(err, content.Close()) }()
+
+	fw, err := w.CreateFormFile("files", fileName)
+	if err != nil {
+		return fmt.Errorf("create file part: %w", err)
+	}
+	if _, err = io.Copy(fw, content); err != nil {
+		return fmt.Errorf("copy file content: %w", err)
+	}
+	return nil
 }
