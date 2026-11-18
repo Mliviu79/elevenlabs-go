@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -535,9 +536,10 @@ func (c *Client) GetHistory(ctx context.Context, queries ...QueryFunc) (GetHisto
 	}
 
 	nextPageFunc := func(ctx context.Context, qf ...QueryFunc) (GetHistoryResponse, NextHistoryPageFunc, error) {
-		//TODO copy to new slice to avoid unexpected issues if query changes after few calls.
-		qf = append(queries, append(qf, StartAfter(historyResp.LastHistoryItemId))...)
-		return c.GetHistory(ctx, qf...)
+		// A new slice for every page, so that nothing is written into the backing array of the
+		// queries either caller passed.
+		nextQueries := slices.Concat(queries, qf, []QueryFunc{StartAfter(historyResp.LastHistoryItemId)})
+		return c.GetHistory(ctx, nextQueries...)
 	}
 	return historyResp, nextPageFunc, nil
 }

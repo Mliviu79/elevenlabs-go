@@ -725,6 +725,39 @@ func TestGetHistory(t *testing.T) {
 	}
 }
 
+// TestGetHistoryNextPageLeavesCallerQueries verifies that the next-page function does not write
+// into the spare capacity of the queries slice the caller passed to GetHistory.
+func TestGetHistoryNextPageLeavesCallerQueries(t *testing.T) {
+	server := testServer(t, testServerConfig{
+		expectedMethod: http.MethodGet,
+		statusCode:     http.StatusOK,
+		responseBody:   testRespBodies["TestGetHistory-HasMore"],
+	})
+	defer server.Close()
+	client := elevenlabs.NewMockClient(server.URL, mockAPIKey, mockTimeout)
+	// One query in a backing array with room for three more: an append to this slice would land
+	// in the caller's array.
+	queries := make([]elevenlabs.QueryFunc, 1, 4)
+	queries[0] = elevenlabs.PageSize(50)
+
+	_, nextPage, err := client.GetHistory(t.Context(), queries...)
+	if err != nil {
+		t.Fatalf("GetHistory() error = %v, want nil", err)
+	}
+	if nextPage == nil {
+		t.Fatal("GetHistory() returned no next-page function for a response with has_more set")
+	}
+	if _, _, err := nextPage(t.Context()); err != nil {
+		t.Fatalf("next page error = %v, want nil", err)
+	}
+
+	for i, query := range queries[len(queries):cap(queries)] {
+		if query != nil {
+			t.Errorf("element %d of the caller's backing array was written by the next-page function, want it left nil", len(queries)+i)
+		}
+	}
+}
+
 func TestGetHistoryItem(t *testing.T) {
 	respBody := testRespBodies["TestGetHistoryItem"]
 	server := testServer(t, testServerConfig{
