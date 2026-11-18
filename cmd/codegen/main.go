@@ -2,16 +2,18 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"io"
-	"io/fs"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"text/template"
 )
@@ -38,7 +40,8 @@ func {{.FuncIdent}}{{.FuncParams}}{{.FuncResults}} {
 {{end}}`
 )
 
-var sourceFiles []string = []string{"client.go", "models.go", "errors.go"}
+// errPackageNotFound reports that no Go file of the directory declares the wanted package.
+var errPackageNotFound = errors.New("codegen: package not found in directory")
 
 type proxyFuncFile struct {
 	GeneratorPath string
@@ -52,11 +55,11 @@ type proxyFunc struct {
 
 func main() {
 	b := bytes.Buffer{}
-	pkg, err := parsePackage(pkgName, ".", []string{genFileName})
+	pkgFiles, err := parsePackage(pkgName, ".", []string{genFileName})
 	if err != nil {
 		log.Fatal(err)
 	}
-	n, err := generate(&b, pkg.Files)
+	n, err := generate(&b, pkgFiles)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -76,8 +79,9 @@ func generate(w io.Writer, pkgFiles map[string]*ast.File) (int, error) {
 		GeneratorPath: g,
 		ReceiverType:  receiverType,
 	}
-	for _, pf := range pkgFiles {
-		methods := ptrRcvMethods(pf, receiverType)
+	// Files are walked in name order, so the output does not depend on map iteration order.
+	for _, fileName := range slices.Sorted(maps.Keys(pkgFiles)) {
+		methods := ptrRcvMethods(pkgFiles[fileName], receiverType)
 		for _, m := range methods {
 			sFile.Functions = append(sFile.Functions, proxyFunc{
 				FuncIdent:      m.Name.Name,
@@ -97,24 +101,34 @@ func generate(w io.Writer, pkgFiles map[string]*ast.File) (int, error) {
 	return total, nil
 }
 
-func parsePackage(pkgName string, path string, excludeFiles []string) (*ast.Package, error) {
-	excludeFunc := func(fi fs.FileInfo) bool {
-		for _, f := range excludeFiles {
-			if fi.Name() == f {
-				return false
-			}
-		}
-		return true
-	}
-	pkgs, err := parser.ParseDir(token.NewFileSet(), path, excludeFunc, 0)
+// parsePackage parses the Go files of the directory at path, in name order, and returns those
+// whose package clause is pkgName, keyed by file name. A file named in excludeFiles is not read.
+// It returns an error wrapping errPackageNotFound when no file declares pkgName.
+func parsePackage(pkgName string, path string, excludeFiles []string) (map[string]*ast.File, error) {
+	entries, err := os.ReadDir(path) // sorted by file name
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse directory %q: %w", path, err)
+		return nil, fmt.Errorf("list source files: %w", err)
 	}
-	pkg, ok := pkgs[pkgName]
-	if !ok {
-		return nil, fmt.Errorf("package %s not found in directory", pkgName)
+	fset := token.NewFileSet()
+	pkgFiles := make(map[string]*ast.File)
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || slices.Contains(excludeFiles, name) {
+			continue
+		}
+		fileName := filepath.Join(path, name)
+		file, err := parser.ParseFile(fset, fileName, nil, 0)
+		if err != nil {
+			return nil, fmt.Errorf("parse source file: %w", err)
+		}
+		if file.Name.Name == pkgName {
+			pkgFiles[fileName] = file
+		}
 	}
-	return pkg, nil
+	if len(pkgFiles) == 0 {
+		return nil, fmt.Errorf("%w: %q", errPackageNotFound, pkgName)
+	}
+	return pkgFiles, nil
 }
 
 func ptrRcvMethods(f *ast.File, receiverTypeStr string) []*ast.FuncDecl {
