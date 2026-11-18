@@ -63,7 +63,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := os.WriteFile(genFileName, b.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(genFileName, b.Bytes(), 0o644); err != nil { //nolint:gosec // the generated file is tracked source and stays readable like every other file in the repository
 		log.Fatal(err)
 	}
 	fmt.Printf("Wrote %d functions to %s\n", n, genFileName)
