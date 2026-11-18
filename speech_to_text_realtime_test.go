@@ -821,6 +821,57 @@ func TestSpeechToTextRealtimeEventDecode(t *testing.T) {
 	}
 }
 
+// TestSpeechToTextRealtimeCharacterDecodeFailureIsNamed verifies that a character that cannot be
+// decoded returns an error that still matches the decoder's and names, in front, the shape that
+// was being decoded. The inputs are this repository's own.
+func TestSpeechToTextRealtimeCharacterDecodeFailureIsNamed(t *testing.T) {
+	testCases := []struct {
+		name         string
+		input        string
+		matchesCause func(error) bool
+		wantCause    string
+		wantStep     string
+	}{
+		{
+			name:  "string",
+			input: `"a`, // a JSON string that never ends
+			matchesCause: func(err error) bool {
+				var syntaxErr *json.SyntaxError
+				return errors.As(err, &syntaxErr)
+			},
+			wantCause: "*json.SyntaxError",
+			wantStep:  "decode character string",
+		},
+		{
+			name:  "object",
+			input: `42`, // a JSON value that is neither a string nor an object
+			matchesCause: func(err error) bool {
+				var typeErr *json.UnmarshalTypeError
+				return errors.As(err, &typeErr)
+			},
+			wantCause: "*json.UnmarshalTypeError",
+			wantStep:  "decode character object",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var character elevenlabs.SpeechToTextRealtimeCharacter
+
+			err := character.UnmarshalJSON([]byte(tc.input))
+
+			if err == nil {
+				t.Fatalf("UnmarshalJSON(%s) = nil, want an error", tc.input)
+			}
+			if !tc.matchesCause(err) {
+				t.Errorf("UnmarshalJSON(%s) = %v, want it to carry the decoder's %s", tc.input, err, tc.wantCause)
+			}
+			if !strings.HasPrefix(err.Error(), tc.wantStep+": ") {
+				t.Errorf("UnmarshalJSON(%s) = %q, want it to open with the failed step %q", tc.input, err, tc.wantStep)
+			}
+		})
+	}
+}
+
 func TestSpeechToTextRealtimeEventErr(t *testing.T) {
 	const prefix = "speech-to-text realtime"
 

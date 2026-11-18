@@ -3,6 +3,7 @@ package elevenlabs
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strconv"
 )
@@ -212,7 +213,7 @@ func (c SpeechToTextRealtimeAudioChunk) MarshalJSON() ([]byte, error) {
 		PreviousText   string   `json:"previous_text,omitempty"`
 		KeytermLibrary []string `json:"keyterm_library,omitempty"`
 	}
-	return json.Marshal(inputAudioChunk{
+	encoded, err := json.Marshal(inputAudioChunk{
 		MessageType:    "input_audio_chunk",
 		AudioBase64:    base64.StdEncoding.EncodeToString(c.Audio),
 		Commit:         c.Commit,
@@ -220,6 +221,10 @@ func (c SpeechToTextRealtimeAudioChunk) MarshalJSON() ([]byte, error) {
 		PreviousText:   c.PreviousText,
 		KeytermLibrary: c.KeytermLibrary,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("encode input_audio_chunk: %w", err)
+	}
+	return encoded, nil
 }
 
 // SpeechToTextRealtimeMessageType is the message_type of a server event. The API adds types over
@@ -530,7 +535,7 @@ func (c *SpeechToTextRealtimeCharacter) UnmarshalJSON(b []byte) error {
 	if len(b) > 0 && b[0] == '"' {
 		var text string
 		if err := json.Unmarshal(b, &text); err != nil {
-			return err
+			return fmt.Errorf("decode character string: %w", err)
 		}
 		*c = SpeechToTextRealtimeCharacter{Text: text}
 		return nil
@@ -540,7 +545,7 @@ func (c *SpeechToTextRealtimeCharacter) UnmarshalJSON(b []byte) error {
 	type character SpeechToTextRealtimeCharacter
 	var decoded character
 	if err := json.Unmarshal(b, &decoded); err != nil {
-		return err
+		return fmt.Errorf("decode character object: %w", err)
 	}
 	*c = SpeechToTextRealtimeCharacter(decoded)
 	return nil
