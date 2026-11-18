@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -197,7 +198,7 @@ func (c *Client) doRequest(ctx context.Context, RespBodyWriter io.Writer, method
 // 4 - max latency optimizations, with text normalizer turned off (best latency, but can mispronounce things like numbers or dates).
 func LatencyOptimizations(value int) QueryFunc {
 	return func(q *url.Values) {
-		q.Add("optimize_streaming_latency", fmt.Sprint(value))
+		q.Add("optimize_streaming_latency", strconv.Itoa(value))
 	}
 }
 
@@ -243,7 +244,7 @@ func WithSettings() QueryFunc {
 // with GetHistory to set the number of elements returned in the GetHistoryResponse.History slice.
 func PageSize(n int) QueryFunc {
 	return func(q *url.Values) {
-		q.Add("page_size", fmt.Sprint(n))
+		q.Add("page_size", strconv.Itoa(n))
 	}
 }
 
