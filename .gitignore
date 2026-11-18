@@ -5,3 +5,4 @@ coverage.out
 .claude/
 .agents/
 skills-lock.json
+bin/

@@ -1,0 +1,189 @@
+version: "2"
+
+run:
+  timeout: 10m
+  tests: false
+
+linters:
+  enable:
+    # --- Core correctness ---
+    - govet           # printf, copylocks, etc.
+    - staticcheck     # SA*, S*, QF* broad static analysis
+    - errcheck        # unchecked errors
+    - ineffassign     # assigned but never used
+    - unused          # unused code
+    - durationcheck   # two time.Duration values multiplied together
+    - reassign        # assignment to another package's variable (io.EOF = …)
+    - asasalint       # []any passed as one any argument to a variadic ...any
+    - gocritic        # the diagnostic tag plus rangeExprCopy, nothing else
+
+    # --- Context correctness ---
+    - noctx           # HTTP requests without context.Context
+    - contextcheck    # a call that passes a non-inherited ctx inside a function that has one
+    - containedctx    # context.Context stored in a struct field
+    - forbidigo       # fresh roots outside an entry point, and every severing (settings below)
+
+    # --- Security ---
+    - gosec           # security scanner, every rule (overflowing conversions, weak random, …)
+    - bodyclose       # HTTP response body not closed
+
+    # --- Error handling ---
+    - nilerr          # returns nil when err != nil (silent failure)
+    - nilnil          # returns (nil, nil) — caller can't distinguish success from nothing
+    - errorlint       # use errors.Is/As, not == or type assertion
+    - err113          # define sentinel errors at package level with errors.New
+    - wrapcheck       # errors from external packages must be wrapped with context
+    - errchkjson      # json encoding errors left unchecked (a discard needs a reason why it cannot fail)
+
+    # --- Struct correctness ---
+    - musttag         # marshaled/unmarshaled structs missing json tags
+    - recvcheck       # a type mixing pointer and value receivers
+    - makezero        # slice declared with non-zero initial length then indexed
+
+    # --- Performance / code quality ---
+    - prealloc        # slices that could be pre-allocated
+    - unconvert       # unnecessary type conversions
+    - wastedassign    # values assigned but never read
+    - unparam         # function parameters that are always the same value
+    - exhaustive      # incomplete switch on typed enums (message types, etc.)
+
+    # --- Misc ---
+    - misspell        # typos in comments and strings
+    - bidichk         # dangerous bidi unicode characters (supply chain safety)
+    - nosprintfhostport # fmt.Sprintf("host:port") misuse in URLs
+    - perfsprint      # fmt.Sprintf replaceable with a faster alternative
+    - dupword         # duplicate words in comments
+    - godox           # FIXME / HACK / XXX markers (keywords below)
+    - nakedret        # naked return in a long function
+    - exptostd        # golang.org/x/exp helpers the standard library has absorbed
+    - mirror          # bytes/strings call pairs with a direct counterpart
+    - usestdlibvars   # literals for net/http methods and statuses, and similar stdlib constants
+    - gocheckcompilerdirectives # malformed //go: directives
+    - predeclared     # identifiers named after a predeclared one (len, max, close, …)
+    - copyloopvar     # redundant per-iteration copy of a loop variable (v := v)
+    - modernize       # hand-written loops and calls a standard-library helper or builtin replaces (min/max, maps.Copy, generic contains and sort, strings.Cut*, WaitGroup.Go)
+    - intrange        # three-clause for loops that can range over an integer
+
+    # --- Checks the code already passes, enabled so it stays that way ---
+    - nilnesserr      # returns a different (often nil) error after checking err != nil
+    - fatcontext      # ctx re-derived from the previous iteration's ctx inside a loop
+    - revive          # deep-exit only: os.Exit / log.Fatal outside main
+    - embeddedstructfieldcheck # no embedded sync.Mutex / RWMutex
+
+    # --- Suppressions ---
+    - nolintlint      # every //nolint names one linter, says why, and still suppresses a finding
+
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment # memory layout, not correctness
+
+    revive:
+      rules:
+        - name: deep-exit
+
+    gocritic:
+      disable-all: true
+      enabled-tags:
+        - diagnostic
+      enabled-checks:
+        - octalLiteral
+        - rangeExprCopy
+
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: '^context\.(Background|TODO)$'
+          msg: "fresh root outside an entry point (context.md §4/§5). Pass the context of the operation's legitimate owner. Do not suppress this diagnostic to bypass ownership review. Cancellation detachment requires an explicit recorded decision."
+        - pattern: '^context\.WithoutCancel$'
+          msg: "severed ctx (context.md §5). Pass the context of the operation's legitimate owner. Do not suppress this diagnostic to bypass ownership review. Cancellation detachment requires an explicit recorded decision."
+
+    embeddedstructfieldcheck:
+      forbid-mutex: true
+      empty-line: false
+
+    exhaustive:
+      # Require exhaustive switches. A default: arm does not count as naming a
+      # value: a switch over an enum names every value, so a constant added
+      # later fails here instead of silently taking the default.
+      default-signifies-exhaustive: false
+
+    wrapcheck:
+      # Wrap errors from everything outside this module.
+      # Internal errors (already typed) don't need wrapping.
+      ignore-package-globs:
+        - github.com/Mliviu79/elevenlabs-go
+        - github.com/Mliviu79/elevenlabs-go/*
+      ignore-sigs:
+        - .Errorf(
+        - errors.New(
+        - errors.Unwrap(
+        - errors.Join(
+        - .Wrap(
+        - .Wrapf(
+      ignore-sig-regexps:
+        - \.Err\(\) error$   # context.Context.Err(), rows.Err() — sentinel errors, wrapping adds noise
+
+    errcheck:
+      check-type-assertions: true
+      # A discarded result (`_ = fn()`) is allowed only for a fire-and-forget
+      # call whose failure changes nothing downstream, with that reason on the
+      # same line. The linter cannot read the reason, so review holds it.
+      check-blank: true
+
+    staticcheck:
+      checks:
+        - "all"
+        - "-ST1003"  # naming conventions — too noisy with SDK-adjacent identifiers
+
+    musttag:
+      functions:
+        - name: encoding/json.Marshal
+          tag: json
+        - name: encoding/json.Unmarshal
+          tag: json
+    godox:
+      # TODO is allowed. These three never merge.
+      keywords:
+        - FIXME
+        - HACK
+        - XXX
+
+    nakedret:
+      # The naming rules allow a naked return only in a few-line function:
+      # past that, the reader has to scan the body to learn what it returns.
+      max-func-lines: 5
+
+    perfsprint:
+      int-conversion: true
+      err-error: true
+      errorf: true
+      sprintf1: true
+      strconcat: false  # string concat is fine for readability
+
+    nolintlint:
+      # A suppression names its linter, says why the case is safe, and goes
+      # once it suppresses nothing.
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+
+  exclusions:
+    rules:
+      # A program's main.go is an entry point, where a root context may be
+      # created (context.md §4). The tools under cmd/ are the programs here.
+      - path: '^(main\.go|cmd/[^/]+/main\.go)$'
+        linters: [forbidigo]
+        text: 'context\.Background'
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  # A second finding on the same line must not be dropped.
+  uniq-by-line: false
