@@ -59,7 +59,7 @@ type SpeechToTextRealtimeOptions struct {
 	MinSilenceDurationMs *int
 	// IncludeTimestamps is the include_timestamps parameter, false by default. When true, each
 	// committed transcript is followed by a committed_transcript_with_timestamps event carrying
-	// its words and their timings. It cannot be combined with FilterBackgroundAudio.
+	// its words and their timings.
 	IncludeTimestamps *bool
 	// IncludeLanguageDetection is the include_language_detection parameter, false by default.
 	// When true, partial_transcript and committed_transcript_with_timestamps events carry the
@@ -100,7 +100,7 @@ type SpeechToTextRealtimeOptions struct {
 	TranscriptEdit string
 	// FilterBackgroundAudio is the filter_background_audio parameter, false by default. When
 	// true, voice activity detection ignores background speech and ambient noise. It cannot be
-	// combined with IncludeTimestamps or Diarize.
+	// combined with Diarize.
 	FilterBackgroundAudio *bool
 	// KeepaliveIntervalMs is the keepalive_interval_ms parameter, from 500 to 10000
 	// milliseconds, off by default. About once per interval, while the caller keeps sending
