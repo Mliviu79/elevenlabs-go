@@ -485,6 +485,35 @@ func TestSpeechToTextRealtimeEventDecode(t *testing.T) {
 			},
 		},
 		{
+			// The first word of a committed_transcript_with_timestamps event captured from the API
+			// on 2026-11-18 (scribe_v2_realtime), verbatim; the text is shortened to that word. The
+			// API sends the word in the shape of a diarized word: its characters are objects with
+			// timings, not the strings of the reference's TranscriptionWord, and speaker_id and
+			// channel_index are present and null.
+			name:    "committed_transcript_with_timestamps as the API sent it",
+			payload: `{"message_type":"committed_transcript_with_timestamps","text":"Bună","language_code":"ro","words":[{"text":"Bună","start":0.06,"end":0.22,"type":"word","speaker_id":null,"logprob":-0.5030074119567871,"characters":[{"text":"B","start":0.06,"end":0.1},{"text":"u","start":0.1,"end":0.14},{"text":"n","start":0.14,"end":0.16},{"text":"ă","start":0.16,"end":0.22}],"channel_index":null}]}`,
+			want: elevenlabs.SpeechToTextRealtimeEvent{
+				MessageType:  elevenlabs.SpeechToTextRealtimeCommittedTranscriptWithTimestamps,
+				Text:         "Bună",
+				LanguageCode: ptr("ro"),
+				Words: []elevenlabs.SpeechToTextRealtimeWord{
+					{
+						Text:    "Bună",
+						Start:   ptr(0.06),
+						End:     ptr(0.22),
+						Type:    "word",
+						Logprob: ptr(-0.5030074119567871),
+						Characters: []elevenlabs.SpeechToTextRealtimeCharacter{
+							{Text: "B", Start: ptr(0.06), End: ptr(0.1)},
+							{Text: "u", Start: ptr(0.1), End: ptr(0.14)},
+							{Text: "n", Start: ptr(0.14), End: ptr(0.16)},
+							{Text: "ă", Start: ptr(0.16), End: ptr(0.22)},
+						},
+					},
+				},
+			},
+		},
+		{
 			// The same schema, whose language_code and words may both be null.
 			name: "committed_transcript_with_timestamps with null words",
 			payload: `{

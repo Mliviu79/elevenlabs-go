@@ -236,9 +236,10 @@ const (
 	// SpeechToTextRealtimeCommittedTranscript carries the final text of a segment, which does not
 	// change afterwards.
 	SpeechToTextRealtimeCommittedTranscript SpeechToTextRealtimeMessageType = "committed_transcript"
-	// SpeechToTextRealtimeCommittedTranscriptWithTimestamps follows a committed transcript with
-	// its words, their timings and the detected language. It is sent when timestamps or language
-	// detection are requested.
+	// SpeechToTextRealtimeCommittedTranscriptWithTimestamps carries a committed transcript again
+	// with its words, their timings and the detected language. It is sent when timestamps or
+	// language detection are requested, and it may arrive before the committed_transcript event
+	// of the same segment as well as after it.
 	SpeechToTextRealtimeCommittedTranscriptWithTimestamps SpeechToTextRealtimeMessageType = "committed_transcript_with_timestamps"
 	// SpeechToTextRealtimeDiarizedTranscript follows a committed transcript with its words and
 	// their speakers. It is sent with diarization.
@@ -487,8 +488,8 @@ type SpeechToTextRealtimeWord struct {
 	// End is the end property, the end time of the word in seconds. It is nil for a word that is
 	// not aligned yet.
 	End *float64 `json:"end"`
-	// Type is the type property: "word" or "spacing", and on a diarized word also "audio_event"
-	// for a sound that is not a word, such as laughter.
+	// Type is the type property: "word", "spacing", or "audio_event" for a sound that is not a
+	// word, such as laughter.
 	Type string `json:"type"`
 	// SpeakerID is the speaker_id property, such as "speaker_0". It is nil while the speaker is
 	// not identified.
@@ -496,17 +497,18 @@ type SpeechToTextRealtimeWord struct {
 	// Logprob is the logprob property, the log of the probability with which the word was
 	// predicted: at most 0, and higher for a more confident prediction.
 	Logprob *float64 `json:"logprob"`
-	// Characters is the characters property, the characters that make up the word. On a diarized
-	// word each carries its timings.
+	// Characters is the characters property, the characters that make up the word, each with its
+	// timings when the API sends it as an object.
 	Characters []SpeechToTextRealtimeCharacter `json:"characters"`
-	// ChannelIndex is the channel_index property of a diarized word, the channel the word was
-	// spoken on in multichannel audio. It is nil for single-channel audio.
+	// ChannelIndex is the channel_index property, the channel the word was spoken on in
+	// multichannel audio. It is nil for single-channel audio.
 	ChannelIndex *int `json:"channel_index"`
 }
 
-// SpeechToTextRealtimeCharacter is one character of a word. The API sends it in two shapes: a
-// committed_transcript_with_timestamps event sends each character as a JSON string, and a
-// diarized word sends an object with text, start and end. Both decode into this type.
+// SpeechToTextRealtimeCharacter is one character of a word. It has two shapes: the API reference
+// describes the characters of a committed_transcript_with_timestamps word as JSON strings and
+// those of a diarized word as objects with text, start and end, and the API sends objects on
+// committed_transcript_with_timestamps too. Both decode into this type.
 type SpeechToTextRealtimeCharacter struct {
 	// Text is the character that was transcribed.
 	Text string `json:"text"`
