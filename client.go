@@ -121,13 +121,14 @@ func (c *Client) requestClient() *http.Client {
 // unsuccessful response is a [*StatusError], whose Err holds the decode failure of a 400, 401 or
 // 422 body that did not decode. Each carries the response's StatusCode. A failure to close the
 // response body is returned as a [*BodyCloseError]: alone when everything else succeeded, otherwise
-// joined behind the earlier error.
+// joined behind the earlier error. A failure to build or send the request, or to read or copy the
+// response body, is returned wrapped with the name of the step.
 func (c *Client) doRequest(ctx context.Context, RespBodyWriter io.Writer, method, url string, bodyBuf io.Reader, contentType string, queries ...QueryFunc) (err error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(timeoutCtx, method, url, bodyBuf)
 	if err != nil {
-		return err
+		return fmt.Errorf("build request: %w", err)
 	}
 
 	req.Header.Add("Accept", "*/*")
@@ -146,7 +147,7 @@ func (c *Client) doRequest(ctx context.Context, RespBodyWriter io.Writer, method
 
 	resp, err := c.requestClient().Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("send request: %w", err)
 	}
 	defer func() {
 		if cerr := resp.Body.Close(); cerr != nil {
@@ -160,21 +161,21 @@ func (c *Client) doRequest(ctx context.Context, RespBodyWriter io.Writer, method
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return err
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("read response body: %w", readErr)
 		}
 		switch resp.StatusCode {
 		case http.StatusBadRequest, http.StatusUnauthorized:
 			apiErr := &APIError{StatusCode: resp.StatusCode}
-			if err := json.Unmarshal(respBody, apiErr); err != nil {
-				return &StatusError{StatusCode: resp.StatusCode, Err: err}
+			if decodeErr := json.Unmarshal(respBody, apiErr); decodeErr != nil {
+				return &StatusError{StatusCode: resp.StatusCode, Err: decodeErr}
 			}
 			return apiErr
 		case http.StatusUnprocessableEntity:
 			valErr := &ValidationError{StatusCode: resp.StatusCode}
-			if err := json.Unmarshal(respBody, valErr); err != nil {
-				return &StatusError{StatusCode: resp.StatusCode, Err: err}
+			if decodeErr := json.Unmarshal(respBody, valErr); decodeErr != nil {
+				return &StatusError{StatusCode: resp.StatusCode, Err: decodeErr}
 			}
 			return valErr
 		default: // statuses are an open set the server may extend, so each is forwarded verbatim in StatusCode
@@ -182,8 +183,10 @@ func (c *Client) doRequest(ctx context.Context, RespBodyWriter io.Writer, method
 		}
 	}
 
-	_, err = io.Copy(RespBodyWriter, resp.Body)
-	return err
+	if _, err = io.Copy(RespBodyWriter, resp.Body); err != nil {
+		return fmt.Errorf("copy response body: %w", err)
+	}
+	return nil
 }
 
 // LatencyOptimizations returns a QueryFunc that sets the http query 'optimize_streaming_latency' to
