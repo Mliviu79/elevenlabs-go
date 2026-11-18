@@ -95,7 +95,7 @@ func generate(w io.Writer, pkgFiles map[string]*ast.File) (int, error) {
 	}
 	t := template.Must(template.New("").Parse(genFileTemplate))
 	if err := t.Execute(w, sFile); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("render proxies: %w", err)
 	}
 
 	return total, nil
@@ -222,11 +222,11 @@ func getCurrentRelPath() (string, error) {
 	if ok {
 		currentDir, err := os.Getwd()
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("find working directory: %w", err)
 		}
 		path, err = filepath.Rel(currentDir, filename)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("make generator path relative: %w", err)
 		}
 	}
 	return path, nil
