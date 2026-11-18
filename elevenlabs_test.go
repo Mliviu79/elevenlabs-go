@@ -747,13 +747,21 @@ func TestGetHistoryNextPageLeavesCallerQueries(t *testing.T) {
 	if nextPage == nil {
 		t.Fatal("GetHistory() returned no next-page function for a response with has_more set")
 	}
-	if _, _, err := nextPage(t.Context()); err != nil {
+	// The queries given to the next-page function have spare room too.
+	pageQueries := make([]elevenlabs.QueryFunc, 1, 4)
+	pageQueries[0] = elevenlabs.PageSize(25)
+	if _, _, err := nextPage(t.Context(), pageQueries...); err != nil {
 		t.Fatalf("next page error = %v, want nil", err)
 	}
 
 	for i, query := range queries[len(queries):cap(queries)] {
 		if query != nil {
-			t.Errorf("element %d of the caller's backing array was written by the next-page function, want it left nil", len(queries)+i)
+			t.Errorf("element %d of the backing array given to GetHistory was written by the next-page function, want it left nil", len(queries)+i)
+		}
+	}
+	for i, query := range pageQueries[len(pageQueries):cap(pageQueries)] {
+		if query != nil {
+			t.Errorf("element %d of the backing array given to the next-page function was written by it, want it left nil", len(pageQueries)+i)
 		}
 	}
 }
