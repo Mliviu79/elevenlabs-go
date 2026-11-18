@@ -362,6 +362,11 @@ type SpeechToTextRealtimeEvent struct {
 // it carries a non-empty error property, so that an error type the API adds later is still
 // reported. The server sends the error event and then closes the connection.
 func (e SpeechToTextRealtimeEvent) Err() error {
+	if e.ErrorMessage != "" {
+		return &SpeechToTextRealtimeError{Type: e.MessageType, Message: e.ErrorMessage}
+	}
+	// The switch names every documented type in one of its two arms, so that a constant added
+	// later has to be classified here.
 	switch e.MessageType {
 	case SpeechToTextRealtimeErrorGeneric,
 		SpeechToTextRealtimeErrorAuth,
@@ -377,11 +382,20 @@ func (e SpeechToTextRealtimeEvent) Err() error {
 		SpeechToTextRealtimeErrorChunkSizeExceeded,
 		SpeechToTextRealtimeErrorInsufficientAudioActivity,
 		SpeechToTextRealtimeErrorTranscriber:
-		return &SpeechToTextRealtimeError{Type: e.MessageType, Message: e.ErrorMessage}
+		return &SpeechToTextRealtimeError{Type: e.MessageType}
+	case SpeechToTextRealtimeSessionStarted,
+		SpeechToTextRealtimePartialTranscript,
+		SpeechToTextRealtimeCommittedTranscript,
+		SpeechToTextRealtimeCommittedTranscriptWithTimestamps,
+		SpeechToTextRealtimeDiarizedTranscript,
+		SpeechToTextRealtimeSpeakersMerged,
+		SpeechToTextRealtimeCommittedTranscriptEntities,
+		SpeechToTextRealtimeRedactedTranscript,
+		SpeechToTextRealtimeEditedTranscript,
+		SpeechToTextRealtimeWarning:
+		return nil
 	}
-	if e.ErrorMessage != "" {
-		return &SpeechToTextRealtimeError{Type: e.MessageType, Message: e.ErrorMessage}
-	}
+	// A type this package does not know, carrying no error property.
 	return nil
 }
 
