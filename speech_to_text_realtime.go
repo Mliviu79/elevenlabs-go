@@ -443,6 +443,9 @@ type SpeechToTextRealtimeSessionConfig struct {
 	// NoVerbatim is the no_verbatim property: whether filler words and disfluencies are removed
 	// from the transcript.
 	NoVerbatim *bool `json:"no_verbatim"`
+	// KeepaliveIntervalMs is the keepalive_interval_ms property, the interval in milliseconds at
+	// which the server sends keepalive partial transcripts. It is nil when keepalives are off.
+	KeepaliveIntervalMs *int `json:"keepalive_interval_ms"`
 }
 
 // SpeechToTextRealtimeWord is a word of a transcript. It decodes both word shapes the API sends:

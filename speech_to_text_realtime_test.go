@@ -296,15 +296,17 @@ func TestSpeechToTextRealtimeEventDecode(t *testing.T) {
 		},
 		{
 			// "Transcripts and commit strategies" says the config echoes keepalive_interval_ms,
-			// null when disabled; the API reference's schema does not list it, so it decodes as
-			// an unknown field. The four booleans are the reverse pattern of the case above, so
-			// between them the two cases tell each boolean from the other three.
-			name: "session_started with a config property the schema does not list",
+			// which the API reference's schema does not list. The property after it is this
+			// repository's invention: a property the package does not know decodes without
+			// error. The four booleans are the reverse pattern of the case above, so between
+			// them the two cases tell each boolean from the other three.
+			name: "session_started with the keepalive echo and an unknown config property",
 			payload: `{
 				"message_type": "session_started",
 				"session_id": "5c1f0d3a9b6e4a27a1c8d2e4f6a8b0c2",
 				"config": {
-					"keepalive_interval_ms": null,
+					"keepalive_interval_ms": 1000,
+					"a_property_added_later": "ignored",
 					"enable_logging": true,
 					"include_timestamps": false,
 					"include_language_detection": true,
@@ -315,6 +317,7 @@ func TestSpeechToTextRealtimeEventDecode(t *testing.T) {
 				MessageType: elevenlabs.SpeechToTextRealtimeSessionStarted,
 				SessionID:   "5c1f0d3a9b6e4a27a1c8d2e4f6a8b0c2",
 				Config: &elevenlabs.SpeechToTextRealtimeSessionConfig{
+					KeepaliveIntervalMs:      ptr(1000),
 					EnableLogging:            ptr(true),
 					IncludeTimestamps:        ptr(false),
 					IncludeLanguageDetection: ptr(true),
