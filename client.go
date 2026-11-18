@@ -186,7 +186,7 @@ func (c *Client) doRequest(ctx context.Context, RespBodyWriter io.Writer, method
 }
 
 // LatencyOptimizations returns a QueryFunc that sets the http query 'optimize_streaming_latency' to
-// a certain value. It is meant to be used used with TextToSpeech and TextToSpeechStream to turn
+// a certain value. It is meant to be used with TextToSpeech and TextToSpeechStream to turn
 // on latency optimization.
 //
 // Possible values:
@@ -202,7 +202,7 @@ func LatencyOptimizations(value int) QueryFunc {
 }
 
 // OutputFormat returns a QueryFunc that sets the http query 'output_format' to a certain value.
-// It is meant to be used used with TextToSpeech and TextToSpeechStream to change the output format to
+// It is meant to be used with TextToSpeech and TextToSpeechStream to change the output format to
 // a value other than the default (mp3_44100_128).
 //
 // Possible values:
@@ -276,7 +276,7 @@ func (c *Client) TextToSpeech(ctx context.Context, voiceID string, ttsReq TextTo
 	return b.Bytes(), nil
 }
 
-// TextToSpeech converts and streams a given text to speech audio using a certain voice.
+// TextToSpeechStream converts and streams a given text to speech audio using a certain voice.
 //
 // It takes an io.Writer argument to which the streamed audio will be copied, a string argument that represents the
 // ID of the voice to be used for the text to speech conversion, a TextToSpeechRequest argument that contain the text
