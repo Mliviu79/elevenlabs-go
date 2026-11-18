@@ -11,8 +11,13 @@ import (
 	"github.com/Mliviu79/elevenlabs-go"
 )
 
-// Every fixture and expectation in this file was written by hand from the ElevenLabs
-// documentation as fetched on 2026-11-18, and names the page it came from:
+// A fixture in this file is one of two kinds, and its comment says which.
+//
+// A capture is a payload the API sent on 2026-11-18, kept verbatim. Where a capture and the
+// documentation disagree, the capture is what the package has to decode.
+//
+// Every other fixture and expectation was written by hand from the ElevenLabs documentation as
+// fetched on 2026-11-18, and names the page it came from:
 //
 //   - "Realtime", the API reference at /docs/api-reference/speech-to-text/v-1-speech-to-text-realtime
 //     (an AsyncAPI 2.6.0 document), called the API reference below.
@@ -21,9 +26,10 @@ import (
 //     and "Server-side streaming".
 //   - "Keyterm prompting", at /docs/eleven-api/guides/how-to/speech-to-text/batch/keyterm-prompting.
 //
-// Fixture and type come from the same documents, so a passing test proves the package agrees with
-// that reading of them. Values the documents do not give (timings, identifiers, error texts) are
-// this repository's own and are marked as such.
+// A fixture written from the documents and the type it tests come from the same reading of them,
+// so that test passing proves the package agrees with the reading, not with the API. Values the
+// documents do not give (timings, identifiers, error texts) are this repository's own and are
+// marked as such.
 
 func TestSpeechToTextRealtimeOptionsQuery(t *testing.T) {
 	t.Run("zero value sets nothing", func(t *testing.T) {
