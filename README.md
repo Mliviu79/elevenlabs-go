@@ -275,6 +275,85 @@ type AlignmentInfo struct {
 }
 ```
 
+## Realtime Speech-to-Text
+
+The package provides the typed protocol of the realtime speech-to-text WebSocket API: the connection options, the audio chunk message and the server events. It opens no connection itself. Dial `SpeechToTextRealtimeURL` with your own WebSocket library, appending the query string built from the options, and send your API key in the `xi-api-key` header of the handshake.
+
+```go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+
+	"github.com/Mliviu79/elevenlabs-go"
+)
+
+func main() {
+	// A nil pointer leaves a parameter out; a set one is sent, false included.
+	includeTimestamps := true
+	options := elevenlabs.SpeechToTextRealtimeOptions{
+		ModelID:           "scribe_v2_realtime",
+		AudioFormat:       "pcm_16000",
+		CommitStrategy:    "vad",
+		IncludeTimestamps: &includeTimestamps,
+		Keyterms:          []string{"ElevenLabs", "Scribe"},
+	}
+
+	// Dial this URL with a WebSocket library, sending the API key in the
+	// xi-api-key header of the handshake.
+	fmt.Println(elevenlabs.SpeechToTextRealtimeURL + "?" + options.Query().Encode())
+	// wss://api.elevenlabs.io/v1/speech-to-text/realtime?audio_format=pcm_16000&commit_strategy=vad&include_timestamps=true&keyterms=ElevenLabs&keyterms=Scribe&model_id=scribe_v2_realtime
+
+	// Send audio as it becomes available
+	audioMessage, err := json.Marshal(elevenlabs.SpeechToTextRealtimeAudioChunk{
+		Audio:      []byte("pcm"),
+		SampleRate: 16000,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(audioMessage))
+	// {"message_type":"input_audio_chunk","audio_base_64":"cGNt","commit":false,"sample_rate":16000}
+
+	// Commit the segment without sending more audio
+	commitMessage, err := json.Marshal(elevenlabs.SpeechToTextRealtimeAudioChunk{
+		Commit:     true,
+		SampleRate: 16000,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(commitMessage))
+	// {"message_type":"input_audio_chunk","audio_base_64":"","commit":true,"sample_rate":16000}
+
+	// Two text messages as the server sends them
+	messages := []string{
+		`{"message_type":"committed_transcript","text":"Hello, world."}`,
+		`{"message_type":"auth_error","error":"Invalid API key."}`,
+	}
+
+	for _, message := range messages {
+		var event elevenlabs.SpeechToTextRealtimeEvent
+		if err := json.Unmarshal([]byte(message), &event); err != nil {
+			log.Fatal(err)
+		}
+
+		// Check for a server error before using the event
+		if err := event.Err(); err != nil {
+			fmt.Println("server error:", err)
+			continue
+		}
+		fmt.Printf("%s: %s\n", event.MessageType, event.Text)
+	}
+	// committed_transcript: Hello, world.
+	// server error: speech-to-text realtime auth_error: Invalid API key.
+}
+```
+
+Write each marshalled chunk as a text message. Decode each text message you receive into a `SpeechToTextRealtimeEvent` and check `Err()` first: the server sends an error event and then closes the connection.
+
 ## Status and Future Plans
 
 This fork maintains compatibility with the original library while providing updated structs to match the latest ElevenLabs API.
