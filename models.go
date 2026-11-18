@@ -281,7 +281,7 @@ func (r *AddEditVoiceRequest) buildRequestBody() (*bytes.Buffer, string, error) 
 	var b bytes.Buffer
 	w := multipart.NewWriter(&b)
 	buildFailed := func(err error) (*bytes.Buffer, string, error) {
-		return nil, "", fmt.Errorf("failed to build request body: %w", err)
+		return nil, "", fmt.Errorf("build request body: %w", err)
 	}
 
 	if err := w.WriteField("name", r.Name); err != nil {
