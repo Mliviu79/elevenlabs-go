@@ -1,9 +1,3 @@
-//go:build go1.25
-
-// testing/synctest refuses to run under the timer channels the module's go 1.18 directive selects
-// (those from before Go 1.23); this selects the current ones for this package's test binary only.
-//go:debug asynctimerchan=0
-
 package elevenlabs
 
 import (

@@ -1,6 +1,6 @@
 # elevenlabs-go v0.2.0
 
-![Go version](https://img.shields.io/badge/go-1.18-blue)
+![Go version](https://img.shields.io/badge/go-1.27-blue)
 ![License](https://img.shields.io/github/license/Mliviu79/elevenlabs-go)
 ![Tests](https://github.com/haguro/elevenlabs-go/actions/workflows/tests.yml/badge.svg?branch=main&event=push)
 [![codecov](https://codecov.io/gh/haguro/elevenlabs-go/branch/main/graph/badge.svg?token=UM33DSSTAG)](https://codecov.io/gh/haguro/elevenlabs-go)
